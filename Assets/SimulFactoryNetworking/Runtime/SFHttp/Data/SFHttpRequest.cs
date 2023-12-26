@@ -1,5 +1,7 @@
 ﻿using SimulFactoryNetworking.Runtime.Common;
 using System.Net;
+using System.Text;
+using UnityEditor.PackageManager.Requests;
 
 namespace SimulFactoryNetworking.Runtime.SFHttp.Data
 {
@@ -11,8 +13,9 @@ namespace SimulFactoryNetworking.Runtime.SFHttp.Data
         private string content;
         private int port;
         private string path;
+        private int timeOut;
 
-        public SFHttpRequest(string host, string path, int port, HTTP_METHOD method)
+        public SFHttpRequest(string host, string path, int port, HTTP_METHOD method , int timeOut)
         {
             this.host = host;
             this.path = path;
@@ -20,6 +23,7 @@ namespace SimulFactoryNetworking.Runtime.SFHttp.Data
             this.method = method;
             contentType = string.Empty;
             content = string.Empty;
+            this.timeOut = timeOut;
         }
 
         public string GetHost()
@@ -42,6 +46,11 @@ namespace SimulFactoryNetworking.Runtime.SFHttp.Data
             return HttpMethodString.GetHttpMethodString(method);
         }
 
+        public int GetTimeOut()
+        {
+            return timeOut;
+        }
+
         public SFHttpRequest SetContentType(string contentType)
         {
             this.contentType = contentType;
@@ -62,6 +71,17 @@ namespace SimulFactoryNetworking.Runtime.SFHttp.Data
         public string GetContent()
         {
             return content;
+        }
+
+        public byte[] GetHttpRequest()
+        {
+            string http = $"{GetMethod()} {GetPath()} HTTP/1.1\r\n" +
+            $"Host: {GetHost()}\r\n" +
+                            $"Content-Type: {GetContentType()}\r\n" +
+                            $"Connection: keep-alive\r\n" +
+                            $"Accept: */*\r\n" +
+                            $"Accept-Encoding: gzip, deflate\r\n\r\n";
+            return Encoding.UTF8.GetBytes(http);
         }
     }
 }

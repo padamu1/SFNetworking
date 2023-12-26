@@ -1,20 +1,35 @@
-﻿namespace SimulFactoryNetworking.Runtime.SFHttp.Data
+﻿using System.Collections.Generic;
+
+namespace SimulFactoryNetworking.Runtime.SFHttp.Data
 {
     public class SFHttpResponse
     {
         private int statusCode;
         private string body;
-        private string contentType;
+        private Dictionary<string, string> headerDic;
 
-        public SFHttpResponse()
+        public SFHttpResponse(string response)
         {
+            string[] dataArray = response.Split("\r\n\r\n");
+
+            string[] headers = dataArray[0].Split("\r\n");
+
+            string[] result = headers[0].Split(' ');
+
+            statusCode = int.Parse(result[1]);
+
+            headerDic = new Dictionary<string, string>();
+
+            for(int index = 1;  index < headers.Length; index++)
+            {
+                string[] headerInfo = headers[index].Split(":");
+
+                headerDic.Add(headerInfo[0], headerInfo[1].Trim());
+            }
+
+            body = dataArray[1];
+
             body = string.Empty;
-            contentType = string.Empty;
-        }
-
-        public void SetStatus(int statusCode)
-        {
-            this.statusCode = statusCode;
         }
 
         public int GetStatusCode()
@@ -22,19 +37,15 @@
             return statusCode;
         }
 
-        public void SetContentType(string contentType)
+        public bool TryGetHeader(string key, out string value)
         {
-            this.contentType = contentType;
-        }
-
-        public string GetContextType()
-        {
-            return this.contentType;
-        }
-
-        public void SetBody(string body)
-        {
-            this.body = body;
+            if (headerDic.ContainsKey(key))
+            {
+                value = headerDic[key];
+                return true;
+            }
+            value = null;
+            return false;
         }
 
         public string GetBody()
