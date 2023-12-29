@@ -1,9 +1,9 @@
-﻿using SimulFactoryNetworking.Runtime.Common;
+﻿using SimulFactoryNetworking.UniTaskVersion.Runtime.Common;
 using System.Net;
 using System.Text;
 using UnityEditor.PackageManager.Requests;
 
-namespace SimulFactoryNetworking.Runtime.SFHttp.Data
+namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp.Data
 {
     public class SFHttpRequest
     {

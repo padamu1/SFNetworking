@@ -1,13 +1,12 @@
-﻿using Cysharp.Threading.Tasks;
-using SimulFactoryNetworking.Runtime.Common;
-using SimulFactoryNetworking.Runtime.Core;
+﻿using SimulFactoryNetworking.TaskVersion.Runtime.Common;
+using SimulFactoryNetworking.TaskVersion.Runtime.Core;
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.XR;
 
-namespace SimulFactoryNetworking.Runtime.SFTcp
+namespace SimulFactoryNetworking.TaskVersion.Runtime.SFTcp
 {
     public class SFTcpClient<T> : SFClient
     {
@@ -27,7 +26,7 @@ namespace SimulFactoryNetworking.Runtime.SFTcp
             socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
         }
 
-        protected override async UniTask Receive()
+        protected override async Task Receive()
         {
             while(socket.Connected)
             {
@@ -63,7 +62,7 @@ namespace SimulFactoryNetworking.Runtime.SFTcp
                     }
                 }
 
-                await UniTask.DelayFrame(1);
+                await Task.Delay(10);
             }
         }
 
@@ -71,12 +70,12 @@ namespace SimulFactoryNetworking.Runtime.SFTcp
         {
             byte[] bytes = serializer.Serialize(packet);
 
-            UniTask.Create(() => base.Send(bytes));
+            Task.Run(async () => await base.Send(bytes));
         }
 
         public void Send(byte[] bytes)
         {
-            UniTask.Create(() => base.Send(bytes));
+            Task.Run(async () => await base.Send(bytes));
         }
 
         public int CheckData()

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace SimulFactoryNetworking.Runtime.Common
+namespace SimulFactoryNetworking.TaskVersion.Runtime.Common
 {
     public enum HTTP_METHOD
     {

@@ -1,9 +1,9 @@
-using Cysharp.Threading.Tasks;
 using System;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 using UnityEngine;
 
-namespace SimulFactoryNetworking.Runtime.Core
+namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
 {
     public class ConnectEventArgs : EventArgs
     {
@@ -16,7 +16,7 @@ namespace SimulFactoryNetworking.Runtime.Core
         protected int receiveTimeOut;
         protected int sendTimeOut;
         public event EventHandler<ConnectEventArgs> Conneted;
-        private UniTask receiveTask;
+        private Task receiveTask;
 
         public bool IsConnected => socket.Connected;
 
@@ -34,14 +34,14 @@ namespace SimulFactoryNetworking.Runtime.Core
         {
             if(connectEventArgs.isConnected)
             {
-                receiveTask = UniTask.Create(() => Receive());
+                receiveTask = Task.Run(async () => await Receive());
             }
         }
         public void Connect(string uri, int port)
         {
-            UniTask t = UniTask.Create(() => ToConnect(uri, port));
+            Task.Run(async() => await ToConnect(uri, port));
         }
-        private async UniTask ToConnect(string uri, int port)
+        private async Task ToConnect(string uri, int port)
         {
             float connectStartTime = Time.realtimeSinceStartup;
             while(socket.Connected == false)
@@ -69,14 +69,14 @@ namespace SimulFactoryNetworking.Runtime.Core
             socket.Close();
         }
 
-        public virtual void Dispose() => receiveTask.ToCancellationToken().WaitUntilCanceled();
+        public virtual void Dispose() => receiveTask.Dispose();
 
-        protected async UniTask Send(byte[] bytes) 
+        protected async Task Send(byte[] bytes) 
         {
             socket.Send(bytes);
         }
 
-        protected abstract UniTask Receive();
+        protected abstract Task Receive();
 
         public void SetConnectTimeOut(int miliseconds) => connectTimeout = miliseconds;
 

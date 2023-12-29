@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SimulFactoryNetworking.Runtime.Common
+namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Common
 {
     public interface ISerializer<T>
     {

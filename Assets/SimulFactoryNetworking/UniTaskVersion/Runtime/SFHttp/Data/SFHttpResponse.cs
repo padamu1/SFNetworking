@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace SimulFactoryNetworking.Runtime.SFHttp.Data
+namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp.Data
 {
     public class SFHttpResponse
     {

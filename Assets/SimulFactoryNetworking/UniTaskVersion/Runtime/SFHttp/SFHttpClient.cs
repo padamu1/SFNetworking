@@ -1,11 +1,11 @@
 ﻿using Cysharp.Threading.Tasks;
-using SimulFactoryNetworking.Runtime.Core;
-using SimulFactoryNetworking.Runtime.SFHttp.Data;
+using SimulFactoryNetworking.UniTaskVersion.Runtime.Core;
+using SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp.Data;
 using System;
 using System.Net.Sockets;
 using System.Text;
 
-namespace SimulFactoryNetworking.Runtime.SFHttp
+namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp
 {
     public class SFHttpClient : SFClient
     {
