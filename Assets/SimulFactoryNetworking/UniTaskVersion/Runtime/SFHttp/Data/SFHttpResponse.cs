@@ -1,12 +1,16 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using Unity.Plastic.Newtonsoft.Json;
 
 namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp.Data
 {
-    public class SFHttpResponse
+    public class SFHttpResponse<T>
     {
         private int statusCode;
-        private string body;
+        private StringBuilder body;
         private Dictionary<string, string> headerDic;
+        private T data;
 
         public SFHttpResponse(string response)
         {
@@ -27,9 +31,8 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp.Data
                 headerDic.Add(headerInfo[0], headerInfo[1].Trim());
             }
 
-            body = dataArray[1];
-
-            body = string.Empty;
+            body = new StringBuilder();
+            body.Append(response.Remove(0, dataArray[0].Length + 4));
         }
 
         public int GetStatusCode()
@@ -48,9 +51,24 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp.Data
             return false;
         }
 
+        public void AddBody(string body)
+        {
+            this.body.Append(body);
+        }
+
         public string GetBody()
         {
-            return this.body;
+            return body.ToString();
+        }
+
+        public void ConvertToJson()
+        {
+            data = JsonConvert.DeserializeObject<T>(body.ToString());
+        }
+
+        public T GetJsonData()
+        {
+            return data;
         }
     }
 }

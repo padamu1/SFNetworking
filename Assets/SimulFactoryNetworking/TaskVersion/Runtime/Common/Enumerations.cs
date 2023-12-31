@@ -34,4 +34,9 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.Common
             }
         }
     }
+
+    public class HttpContentType
+    {
+        public const string ApplicationJson = "application/json";
+    }
 }
