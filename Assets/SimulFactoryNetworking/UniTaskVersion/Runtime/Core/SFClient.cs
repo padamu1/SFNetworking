@@ -46,7 +46,15 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Core
             float connectStartTime = Time.realtimeSinceStartup;
             while(socket.Connected == false)
             {
-                await socket.ConnectAsync(uri, port);
+                try
+                {
+                    await socket.ConnectAsync(uri, port);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.ToString());
+                }
+
                 if(Time.realtimeSinceStartup - connectStartTime > connectTimeout)
                 {
                     break;
