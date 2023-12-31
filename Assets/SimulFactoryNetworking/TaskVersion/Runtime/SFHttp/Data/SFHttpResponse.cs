@@ -27,9 +27,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFHttp.Data
                 headerDic.Add(headerInfo[0], headerInfo[1].Trim());
             }
 
-            body = dataArray[1];
-
-            body = string.Empty;
+            body = response.Remove(0, dataArray[0].Length);
         }
 
         public int GetStatusCode()
