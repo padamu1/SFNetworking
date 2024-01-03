@@ -4,6 +4,7 @@ using SimulFactoryNetworking.UniTaskVersion.Runtime.Core;
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.XR;
 
@@ -27,10 +28,15 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
             socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
         }
 
-        protected override async UniTask Receive()
+        protected override async UniTask Receive(CancellationTokenSource cancellationTokenSource)
         {
             while(socket.Connected)
             {
+                if(cancellationTokenSource.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 if (socket.Available != 0)
                 {
                     try

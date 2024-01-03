@@ -5,6 +5,7 @@ using SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp.Data;
 using System;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 
 namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp
 {
@@ -34,7 +35,7 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp
                     async () => 
                     {
                         await base.Send(request.GetHttpRequest());
-                        await Receive();
+                        await Receive(null);
                     });
             }
         }
@@ -44,7 +45,7 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         }
 
-        protected override async UniTask Receive()
+        protected override async UniTask Receive(CancellationTokenSource cancellationTokenSource)
         {
             byte[] recvBuff = new byte[socket.ReceiveBufferSize];
 
@@ -83,6 +84,11 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp
         {
             SFHttpResponse<T> response = new SFHttpResponse<T>(result);
             return response;
+        }
+
+        public override void Dispose()
+        {
+            // Do not need dispose
         }
     }
 }

@@ -1,6 +1,7 @@
 using Cysharp.Threading.Tasks;
 using System;
 using System.Net.Sockets;
+using System.Threading;
 using UnityEngine;
 
 namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Core
@@ -16,7 +17,7 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Core
         protected int receiveTimeOut;
         protected int sendTimeOut;
         public event EventHandler<ConnectEventArgs> Conneted;
-        private UniTask receiveTask;
+        private CancellationTokenSource cancelTokenSource;
 
         public bool IsConnected => socket.Connected;
 
@@ -34,7 +35,8 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Core
         {
             if(connectEventArgs.isConnected)
             {
-                receiveTask = UniTask.Create(() => Receive());
+                cancelTokenSource = new CancellationTokenSource();
+                UniTask.Create(() => Receive(cancelTokenSource));
             }
         }
         public void Connect(string uri, int port)
@@ -77,14 +79,14 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Core
             socket.Close();
         }
 
-        public virtual void Dispose() => receiveTask.ToCancellationToken().WaitUntilCanceled();
+        public virtual void Dispose() => cancelTokenSource.Cancel();
 
         protected async UniTask Send(byte[] bytes) 
         {
             socket.Send(bytes);
         }
 
-        protected abstract UniTask Receive();
+        protected abstract UniTask Receive(CancellationTokenSource cancellationTokenSource);
 
         public void SetConnectTimeOut(int miliseconds) => connectTimeout = miliseconds;
 
