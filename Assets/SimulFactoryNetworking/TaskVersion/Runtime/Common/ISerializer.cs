@@ -2,7 +2,7 @@
 {
     public interface ISerializer<T>
     {
-        public object Deserialize(byte[] bytes, out byte[] nextData);
+        public object Deserialize(byte[] bytes);
         public byte[] Serialize(T t);
     }
 }

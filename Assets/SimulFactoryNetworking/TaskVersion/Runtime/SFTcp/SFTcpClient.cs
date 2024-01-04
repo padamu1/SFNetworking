@@ -13,9 +13,10 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFTcp
         private ISerializer<T> serializer;
         private Queue<T> receivePacketQueue;
         private byte[] receiveBuffer = new byte[2147483647];
-
-        public SFTcpClient(ISerializer<T> serializer) : base()
+        private IReceiveFilter receiveFilter;
+        public SFTcpClient(IReceiveFilter receiveFilter, ISerializer<T> serializer) : base()
         {
+            this.receiveFilter = receiveFilter;
             this.serializer = serializer;
             socket.ReceiveBufferSize = 2147483647;
             receivePacketQueue = new Queue<T>();
@@ -43,15 +44,15 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFTcp
 
                             while (incommingData.Length > 0)
                             {
-                                object packetData = serializer.Deserialize(incommingData, out incommingData);
-                                if (packetData != null && packetData.GetType() == typeof(T))
+                                byte[] packetBytes = receiveFilter.Filter(incommingData, out incommingData);
+
+                                if(packetBytes != null)
                                 {
-                                    receivePacketQueue.Enqueue((T)packetData);
-                                    Debug.LogFormat("packet enqueue");
-                                }
-                                else
-                                {
-                                    Debug.LogFormat("packet not enqueue");
+                                    object packetData = serializer.Deserialize(packetBytes);
+                                    if (packetData != null && packetData.GetType() == typeof(T))
+                                    {
+                                        receivePacketQueue.Enqueue((T)packetData);
+                                    }
                                 }
                             }
                         }

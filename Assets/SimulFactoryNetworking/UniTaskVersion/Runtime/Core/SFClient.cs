@@ -17,12 +17,13 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Core
         protected int receiveTimeOut;
         protected int sendTimeOut;
         public event EventHandler<ConnectEventArgs> Conneted;
-        private CancellationTokenSource cancelTokenSource;
+        protected CancellationTokenSource cancelTokenSource;
 
         public bool IsConnected => socket.Connected;
 
         public SFClient()
         {
+            cancelTokenSource = new CancellationTokenSource();
             SetSocket();
             socket.ReceiveTimeout = 1000;
             socket.SendTimeout = 1000;
@@ -35,8 +36,7 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Core
         {
             if(connectEventArgs.isConnected)
             {
-                cancelTokenSource = new CancellationTokenSource();
-                UniTask.Create(() => Receive(cancelTokenSource));
+                UniTask.Create(() => Receive(cancelTokenSource.Token));
             }
         }
         public void Connect(string uri, int port)
@@ -86,7 +86,7 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Core
             socket.Send(bytes);
         }
 
-        protected abstract UniTask Receive(CancellationTokenSource cancellationTokenSource);
+        protected abstract UniTask Receive(CancellationToken cancellationToken);
 
         public void SetConnectTimeOut(int miliseconds) => connectTimeout = miliseconds;
 

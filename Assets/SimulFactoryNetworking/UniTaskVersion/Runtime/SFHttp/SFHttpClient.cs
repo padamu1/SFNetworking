@@ -35,7 +35,7 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp
                     async () => 
                     {
                         await base.Send(request.GetHttpRequest());
-                        await Receive(null);
+                        await Receive(cancelTokenSource.Token);
                     });
             }
         }
@@ -45,7 +45,7 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         }
 
-        protected override async UniTask Receive(CancellationTokenSource cancellationTokenSource)
+        protected override async UniTask Receive(CancellationToken cancellationToken)
         {
             byte[] recvBuff = new byte[socket.ReceiveBufferSize];
 
