@@ -45,7 +45,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFTcp
                             Array.Copy(receiveBuffer, 0, incommingData, 0, receiveLength);
 
                             dataIndex = 0;
-                            while (incommingData.Length > 0)
+                            while (dataIndex < receiveLength)
                             {
                                 byte[] packetBytes = receiveFilter.Filter(incommingData, dataIndex, out dataIndex);
 
