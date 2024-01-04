@@ -2,6 +2,6 @@
 {
     public interface IReceiveFilter
     {
-        public byte[] Filter(byte[] incomingData , out byte[] outgoingData);
+        public byte[] Filter(byte[] incomingData , int startIndex, out int nextIndex);
     }
 }

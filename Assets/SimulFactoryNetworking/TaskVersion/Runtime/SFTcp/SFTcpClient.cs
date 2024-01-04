@@ -14,6 +14,9 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFTcp
         private Queue<T> receivePacketQueue;
         private byte[] receiveBuffer = new byte[2147483647];
         private IReceiveFilter receiveFilter;
+        private int receiveLength;
+        private int dataIndex;
+
         public SFTcpClient(IReceiveFilter receiveFilter, ISerializer<T> serializer) : base()
         {
             this.receiveFilter = receiveFilter;
@@ -35,16 +38,16 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFTcp
                 {
                     try
                     {
-                        int length;
 
-                        if ((length = socket.Receive(receiveBuffer)) > 0)
+                        if ((receiveLength = socket.Receive(receiveBuffer)) > 0)
                         {
-                            var incommingData = new byte[length];
-                            Array.Copy(receiveBuffer, 0, incommingData, 0, length);
+                            var incommingData = new byte[receiveLength];
+                            Array.Copy(receiveBuffer, 0, incommingData, 0, receiveLength);
 
+                            dataIndex = 0;
                             while (incommingData.Length > 0)
                             {
-                                byte[] packetBytes = receiveFilter.Filter(incommingData, out incommingData);
+                                byte[] packetBytes = receiveFilter.Filter(incommingData, dataIndex, out dataIndex);
 
                                 if(packetBytes != null)
                                 {
@@ -74,7 +77,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFTcp
             Task.Run(async () => await base.Send(bytes));
         }
 
-        public void Send(byte[] bytes)
+        new public void Send(byte[] bytes)
         {
             Task.Run(async () => await base.Send(bytes));
         }
