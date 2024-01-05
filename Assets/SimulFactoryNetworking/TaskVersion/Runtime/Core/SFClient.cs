@@ -1,7 +1,6 @@
 using System;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-using UnityEngine;
 
 namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
 {
@@ -43,7 +42,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
         }
         private async Task ToConnect(string uri, int port)
         {
-            float connectStartTime = Time.realtimeSinceStartup;
+            DateTime connectStartTime = DateTime.Now;
             while(socket.Connected == false)
             {
                 try
@@ -55,23 +54,34 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
                     Console.WriteLine(e.ToString());
                 }
 
-                if (Time.realtimeSinceStartup - connectStartTime > connectTimeout)
+                if(socket.Connected == false)
+                {
+                    socket.Close();
+                    SetSocket();
+                }
+
+                if ((DateTime.Now - connectStartTime).TotalMilliseconds > connectTimeout)
                 {
                     break;
                 }
+
+                await Task.Delay(1000);
             }
 
-            var handle = Conneted;
-            if (handle != null)
+            if(IsConnected)
             {
-                handle.Invoke(this, new ConnectEventArgs() 
-                { 
-                    isConnected = socket.Connected 
+                Conneted?.Invoke(this, new ConnectEventArgs()
+                {
+                    isConnected = socket.Connected
                 });
+            }
+            else
+            {
+                Disconnect(SocketError.TimedOut);
             }
         }
 
-        public void Disconnect()
+        public virtual void Disconnect(SocketError socketError = SocketError.Success)
         {
             Dispose();
             socket.Close();

@@ -1,7 +1,9 @@
-﻿namespace SimulFactoryNetworking.TaskVersion.Runtime.Common
+﻿using SimulFactoryNetworking.TaskVersion.Runtime.SFTcp;
+
+namespace SimulFactoryNetworking.TaskVersion.Runtime.Common
 {
     public interface IReceiveFilter
     {
-        public byte[] Filter(byte[] incomingData , int startIndex, out int nextIndex);
+        public void Filter(TcpPacketData tcpPacketData);
     }
 }

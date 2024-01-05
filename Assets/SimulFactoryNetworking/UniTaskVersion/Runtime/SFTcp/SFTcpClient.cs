@@ -5,31 +5,29 @@ using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
-using UnityEngine;
-using UnityEngine.XR;
 
 namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
 {
     public class SFTcpClient<T> : SFClient
     {
+        public event EventHandler<DisconnectEventArgs> Disconnected;
+
         private ISerializer<T> serializer;
         private Queue<T> receivePacketQueue;
-        private byte[] receiveBuffer = new byte[2147483647];
         private IReceiveFilter receiveFilter;
-        private int receiveLength;
-        private int dataIndex;
+        private TcpPacketData tcpPacketData;
 
         public SFTcpClient(IReceiveFilter receiveFilter, ISerializer<T> serializer) : base()
         {
             this.receiveFilter = receiveFilter;
             this.serializer = serializer;
-            socket.ReceiveBufferSize = 2147483647;
-            receivePacketQueue = new Queue<T>();
         }
 
         protected override void SetSocket()
         {
             socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            receivePacketQueue = new Queue<T>();
+            tcpPacketData = new TcpPacketData(8096);
         }
 
         protected override async UniTask Receive(CancellationToken token)
@@ -41,39 +39,36 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
                     return;
                 }
 
-                if (socket.Available != 0)
+                tcpPacketData.receiveLength = socket.Receive(tcpPacketData.receiveBuffer, 0, tcpPacketData.bufferSize, SocketFlags.None, out tcpPacketData.socketError);
+                if (tcpPacketData.socketError == SocketError.Success || tcpPacketData.socketError == SocketError.WouldBlock)
                 {
-                    try
+                    if (tcpPacketData.receiveLength > 0)
                     {
-                        if ((receiveLength = socket.Receive(receiveBuffer)) > 0)
+                        tcpPacketData.currentIndex = 0;
+                        while (tcpPacketData.receiveLength > tcpPacketData.currentIndex)
                         {
-                            var incommingData = new byte[receiveLength];
-                            Array.Copy(receiveBuffer, 0, incommingData, 0, receiveLength);
+                            receiveFilter.Filter(tcpPacketData);
 
-                            dataIndex = 0;
-                            while (dataIndex < receiveLength)
+                            if (tcpPacketData.currentPacketLength == tcpPacketData.totalPacketLength)
                             {
-                                byte[] packetBytes = receiveFilter.Filter(incommingData, dataIndex, out dataIndex);
-
-                                if (packetBytes != null)
+                                T packetData = serializer.Deserialize(tcpPacketData.packet);
+                                if (packetData != null)
                                 {
-                                    object packetData = serializer.Deserialize(packetBytes);
-                                    if (packetData != null && packetData.GetType() == typeof(T))
-                                    {
-                                        receivePacketQueue.Enqueue((T)packetData);
-                                    }
+                                    receivePacketQueue.Enqueue(packetData);
                                 }
                             }
                         }
                     }
-                    catch (Exception e)
-                    {
-                        Debug.LogError(e);
-                    }
+                }
+                else
+                {
+                    break;
                 }
 
                 await UniTask.NextFrame();
             }
+
+            Disconnect(tcpPacketData.socketError);
         }
 
         public void Send(T packet)
@@ -96,6 +91,15 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
         public T GetData()
         {
             return receivePacketQueue.Dequeue();
+        }
+
+        public override void Disconnect(SocketError socketError = SocketError.Success)
+        {
+            Disconnected?.Invoke(this, new DisconnectEventArgs() 
+            { 
+                socketError = socketError
+            });
+            base.Disconnect();
         }
     }
 }
