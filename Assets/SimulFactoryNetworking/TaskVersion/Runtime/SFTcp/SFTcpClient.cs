@@ -25,6 +25,10 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFTcp
         protected override void SetSocket()
         {
             socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            socket.Blocking = false;
+            socket.NoDelay = true;
+            socket.ReceiveTimeout = 30000;
+            socket.SendTimeout = 30000;
             receivePacketQueue = new Queue<T>();
             tcpPacketData = new TcpPacketData(8096);
         }
