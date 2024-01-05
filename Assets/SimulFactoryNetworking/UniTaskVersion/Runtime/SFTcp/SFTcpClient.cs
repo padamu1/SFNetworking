@@ -51,7 +51,7 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
                         tcpPacketData.currentIndex = 0;
                         while (tcpPacketData.receiveLength > tcpPacketData.currentIndex)
                         {
-                            receiveFilter.Filter(tcpPacketData);
+                            TcpFilterModules.Filter(receiveFilter, tcpPacketData);
 
                             if (tcpPacketData.currentPacketLength == tcpPacketData.totalPacketLength)
                             {
