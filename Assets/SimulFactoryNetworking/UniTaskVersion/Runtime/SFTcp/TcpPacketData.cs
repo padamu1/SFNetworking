@@ -1,9 +1,14 @@
-﻿using System.Net.Sockets;
+﻿using System;
+using System.Net.Sockets;
 
 namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
 {
     public class TcpPacketData
     {
+        public byte[] headerBuffer;
+        public int headerBufferSize;
+        public int headerIndex;
+
         public int bufferSize;
         public byte[] receiveBuffer;
         public int receiveLength;
@@ -13,10 +18,15 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
         public int totalPacketLength;
         public SocketError socketError;
 
-        public TcpPacketData(int bufferSize)
+        public DateTime lastDataCheckedTime;
+
+        public TcpPacketData(int bufferSize, int headerBufferSize)
         {
             this.bufferSize = bufferSize;
             receiveBuffer = new byte[bufferSize];
+
+            this.headerBuffer = new byte[headerBufferSize];
+            this.headerBufferSize = headerBufferSize;
         }
     }
 }

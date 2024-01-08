@@ -15,7 +15,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
         protected int receiveTimeOut;
         protected int sendTimeOut;
         public event EventHandler<ConnectEventArgs> Conneted;
-        private Task receiveTask;
+        protected Task receiveTask;
 
         public bool IsConnected => socket.Connected;
 
@@ -87,7 +87,11 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
             socket.Close();
         }
 
-        public virtual void Dispose() => receiveTask.Dispose();
+        public virtual void Dispose()
+        {
+            receiveTask.Dispose();
+            receiveTask = null;
+        }
 
         protected async Task Send(byte[] bytes) 
         {

@@ -36,6 +36,11 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFHttp.Data
             return path;
         }
 
+        public void SetPath(string path)
+        {
+            this.path = path;
+        }
+
         public int GetPort()
         {
             return port;
@@ -44,6 +49,11 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFHttp.Data
         public string GetMethod()
         {
             return HttpMethodString.GetHttpMethodString(method);
+        }
+
+        public void SetMethod(HTTP_METHOD method)
+        {
+            this.method = method;
         }
 
         public int GetTimeOut()

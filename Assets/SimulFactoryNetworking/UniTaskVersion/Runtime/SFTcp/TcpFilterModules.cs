@@ -9,12 +9,44 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
         {
             if (tcpPacketData.currentPacketLength == tcpPacketData.totalPacketLength)
             {
-                receiveFilter.HeaderFilter(tcpPacketData.receiveBuffer, tcpPacketData.currentIndex, out tcpPacketData.currentIndex, out tcpPacketData.totalPacketLength);
+                ParseHeader(receiveFilter, tcpPacketData);
+            }
+
+            if (tcpPacketData.headerIndex == 0)
+            {
+                ParseData(tcpPacketData);
+            }
+        }
+
+        private static void ParseHeader(IReceiveFilter receiveFilter, TcpPacketData tcpPacketData)
+        {
+            int headerLength = tcpPacketData.receiveLength - tcpPacketData.currentIndex - tcpPacketData.headerIndex;
+
+            if (headerLength + tcpPacketData.headerIndex > tcpPacketData.headerBufferSize)
+            {
+                headerLength = tcpPacketData.headerBufferSize - tcpPacketData.headerIndex;
+            }
+
+            Buffer.BlockCopy(tcpPacketData.receiveBuffer, tcpPacketData.currentIndex, tcpPacketData.headerBuffer, tcpPacketData.headerIndex, headerLength);
+
+            if (headerLength + tcpPacketData.headerIndex != tcpPacketData.headerBufferSize)
+            {
+                tcpPacketData.headerIndex = headerLength;
+            }
+            else
+            {
+                tcpPacketData.headerIndex = 0;
+            }
+
+            tcpPacketData.currentIndex += headerLength;
+
+            if (tcpPacketData.headerIndex == 0)
+            {
+                receiveFilter.HeaderFilter(tcpPacketData.headerBuffer, out tcpPacketData.totalPacketLength);
+
                 tcpPacketData.packet = new byte[tcpPacketData.totalPacketLength];
                 tcpPacketData.currentPacketLength = 0;
             }
-
-            ParseData(tcpPacketData);
         }
 
         private static void ParseData(TcpPacketData tcpPacketData)

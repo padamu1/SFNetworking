@@ -17,10 +17,11 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
         private IReceiveFilter receiveFilter;
         private TcpPacketData tcpPacketData;
 
-        public SFTcpClient(IReceiveFilter receiveFilter, ISerializer<T> serializer) : base()
+        public SFTcpClient(int headerBufferSize, IReceiveFilter receiveFilter, ISerializer<T> serializer) : base()
         {
             this.receiveFilter = receiveFilter;
             this.serializer = serializer;
+            tcpPacketData = new TcpPacketData(8096, headerBufferSize);
         }
 
         protected override void SetSocket()
@@ -31,48 +32,65 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
             socket.ReceiveTimeout = 30000;
             socket.SendTimeout = 30000;
             receivePacketQueue = new Queue<T>();
-            tcpPacketData = new TcpPacketData(8096);
         }
 
         protected override async UniTask Receive(CancellationToken token)
         {
-            while (socket.Connected)
+            tcpPacketData.socketError = SocketError.Success;
+
+            tcpPacketData.lastDataCheckedTime = DateTime.Now;
+
+            ReceiveData(token).Forget();
+        }
+
+        protected async UniTask ReceiveData(CancellationToken token)
+        {
+            if (token.IsCancellationRequested)
             {
-                if (token.IsCancellationRequested)
-                {
-                    return;
-                }
+                return;
+            }
 
-                tcpPacketData.receiveLength = socket.Receive(tcpPacketData.receiveBuffer, 0, tcpPacketData.bufferSize, SocketFlags.None, out tcpPacketData.socketError);
-                if (tcpPacketData.socketError == SocketError.Success || tcpPacketData.socketError == SocketError.WouldBlock)
+            tcpPacketData.receiveLength = socket.Receive(tcpPacketData.receiveBuffer, 0, tcpPacketData.receiveBuffer.Length, SocketFlags.None, out tcpPacketData.socketError);
+
+            // Success => 수신에 이상 없음
+            // WouldBlock => 수신에 이상은 없으나, 뒤에 추가 데이터가 남아있음
+            if (tcpPacketData.socketError == SocketError.Success || tcpPacketData.socketError == SocketError.WouldBlock)
+            {
+                if (tcpPacketData.receiveLength > 0)
                 {
-                    if (tcpPacketData.receiveLength > 0)
+                    tcpPacketData.currentIndex = 0;
+                    while (tcpPacketData.currentIndex < tcpPacketData.receiveLength)
                     {
-                        tcpPacketData.currentIndex = 0;
-                        while (tcpPacketData.receiveLength > tcpPacketData.currentIndex)
-                        {
-                            TcpFilterModules.Filter(receiveFilter, tcpPacketData);
+                        TcpFilterModules.Filter(receiveFilter, tcpPacketData);
 
-                            if (tcpPacketData.currentPacketLength == tcpPacketData.totalPacketLength)
+                        if (tcpPacketData.headerIndex == 0 && tcpPacketData.currentPacketLength == tcpPacketData.totalPacketLength)
+                        {
+                            T packetData = serializer.Deserialize(tcpPacketData.packet);
+                            if (packetData != null)
                             {
-                                T packetData = serializer.Deserialize(tcpPacketData.packet);
-                                if (packetData != null)
-                                {
-                                    receivePacketQueue.Enqueue(packetData);
-                                }
+                                receivePacketQueue.Enqueue(packetData);
                             }
                         }
                     }
                 }
                 else
                 {
-                    break;
+                    if (tcpPacketData.headerIndex != 0)
+                    {
+                        receiveFilter.CheckUnknownPacket(tcpPacketData.headerBuffer, out tcpPacketData.socketError);
+                        Disconnect(tcpPacketData.socketError);
+                        return;
+                    }
                 }
-
-                await UniTask.NextFrame();
+            }
+            else
+            {
+                Disconnect(tcpPacketData.socketError);
+                return;
             }
 
-            Disconnect(tcpPacketData.socketError);
+            await UniTask.NextFrame();
+            ReceiveData(token).Forget();
         }
 
         public void Send(T packet)
@@ -89,6 +107,13 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
 
         public int CheckData()
         {
+            if ((DateTime.Now - tcpPacketData.lastDataCheckedTime).TotalMilliseconds > socket.ReceiveTimeout)
+            {
+                tcpPacketData.socketError = SocketError.TimedOut;
+                Disconnect(tcpPacketData.socketError);
+                return 0;
+            }
+            tcpPacketData.lastDataCheckedTime = DateTime.Now;
             return receivePacketQueue.Count;
         }
 
@@ -99,10 +124,16 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
 
         public override void Disconnect(SocketError socketError = SocketError.Success)
         {
+            if (cancelTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+
             Disconnected?.Invoke(this, new DisconnectEventArgs() 
             { 
                 socketError = socketError
             });
+
             base.Disconnect();
         }
     }
