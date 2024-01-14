@@ -85,12 +85,16 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFHttp.Data
 
         public byte[] GetHttpRequest()
         {
+            byte[] array = Encoding.UTF8.GetBytes(content);
+
             string http = $"{GetMethod()} {GetPath()} HTTP/1.1\r\n" +
             $"Host: {GetHost()}\r\n" +
                             $"Content-Type: {GetContentType()}\r\n" +
+                            $"Content-Length: {array.Length}\r\n" +
                             $"Connection: keep-alive\r\n" +
                             $"Accept: */*\r\n" +
-                            $"Accept-Encoding: gzip, deflate\r\n\r\n";
+                            $"Accept-Encoding: gzip, deflate\r\n\r\n"
+                            + content;
             return Encoding.UTF8.GetBytes(http);
         }
     }

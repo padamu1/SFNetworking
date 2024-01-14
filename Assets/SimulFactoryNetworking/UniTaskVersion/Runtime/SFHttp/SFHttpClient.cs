@@ -50,7 +50,13 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp
             byte[] recvBuff = new byte[socket.ReceiveBufferSize];
 
             // Header Data
-            int nCount = socket.Receive(recvBuff);
+            int nCount = socket.Receive(recvBuff, 0, recvBuff.Length, SocketFlags.None, out SocketError socketError);
+
+            if (socketError == SocketError.TimedOut)
+            {
+                Receive(cancellationToken).Forget();
+                return;
+            }
 
             string result = Encoding.ASCII.GetString(recvBuff, 0, nCount);
             SFHttpResponse<T> httpResponse = ParseData(result);

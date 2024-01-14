@@ -1,4 +1,5 @@
-﻿using SimulFactoryNetworking.TaskVersion.Runtime.Common;
+﻿using Codice.Utils;
+using SimulFactoryNetworking.TaskVersion.Runtime.Common;
 using SimulFactoryNetworking.TaskVersion.Runtime.Core;
 using SimulFactoryNetworking.TaskVersion.Runtime.SFHttp.Data;
 using System;
@@ -49,7 +50,13 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFHttp
             byte[] recvBuff = new byte[socket.ReceiveBufferSize];
 
             // Header Data
-            int nCount = socket.Receive(recvBuff);
+            int nCount = socket.Receive(recvBuff, 0, recvBuff.Length, SocketFlags.None, out SocketError socketError);
+
+            if (socketError == SocketError.TimedOut)
+            {
+                await Receive();
+                return;
+            }
 
             string result = Encoding.ASCII.GetString(recvBuff, 0, nCount);
             SFHttpResponse<T> httpResponse = ParseData(result);
