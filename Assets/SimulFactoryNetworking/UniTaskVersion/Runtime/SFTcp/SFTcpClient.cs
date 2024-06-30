@@ -40,57 +40,49 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
 
             tcpPacketData.lastDataCheckedTime = DateTime.Now;
 
-            ReceiveData(token).Forget();
-        }
-
-        protected async UniTask ReceiveData(CancellationToken token)
-        {
-            if (token.IsCancellationRequested)
+            while (!token.IsCancellationRequested)
             {
-                return;
-            }
+                tcpPacketData.receiveLength = socket.Receive(tcpPacketData.receiveBuffer, 0, tcpPacketData.receiveBuffer.Length, SocketFlags.None, out tcpPacketData.socketError);
 
-            tcpPacketData.receiveLength = socket.Receive(tcpPacketData.receiveBuffer, 0, tcpPacketData.receiveBuffer.Length, SocketFlags.None, out tcpPacketData.socketError);
-
-            // Success => 수신에 이상 없음
-            // WouldBlock => 수신에 이상은 없으나, 뒤에 추가 데이터가 남아있음
-            if (tcpPacketData.socketError == SocketError.Success || tcpPacketData.socketError == SocketError.WouldBlock)
-            {
-                if (tcpPacketData.receiveLength > 0)
+                // Success => 수신에 이상 없음
+                // WouldBlock => 수신에 이상은 없으나, 뒤에 추가 데이터가 남아있음
+                if (tcpPacketData.socketError == SocketError.Success || tcpPacketData.socketError == SocketError.WouldBlock)
                 {
-                    tcpPacketData.currentIndex = 0;
-                    while (tcpPacketData.currentIndex < tcpPacketData.receiveLength)
+                    if (tcpPacketData.receiveLength > 0)
                     {
-                        TcpFilterModules.Filter(receiveFilter, tcpPacketData);
-
-                        if (tcpPacketData.headerIndex == 0 && tcpPacketData.currentPacketLength == tcpPacketData.totalPacketLength)
+                        tcpPacketData.currentIndex = 0;
+                        while (tcpPacketData.currentIndex < tcpPacketData.receiveLength)
                         {
-                            T packetData = serializer.Deserialize(tcpPacketData.packet);
-                            if (packetData != null)
+                            TcpFilterModules.Filter(receiveFilter, tcpPacketData);
+
+                            if (tcpPacketData.headerIndex == 0 && tcpPacketData.currentPacketLength == tcpPacketData.totalPacketLength)
                             {
-                                receivePacketQueue.Enqueue(packetData);
+                                T packetData = serializer.Deserialize(tcpPacketData.packet);
+                                if (packetData != null)
+                                {
+                                    receivePacketQueue.Enqueue(packetData);
+                                }
                             }
+                        }
+                    }
+                    else
+                    {
+                        if (tcpPacketData.headerIndex != 0)
+                        {
+                            receiveFilter.CheckUnknownPacket(tcpPacketData.headerBuffer, out tcpPacketData.socketError);
+                            Disconnect(tcpPacketData.socketError);
+                            return;
                         }
                     }
                 }
                 else
                 {
-                    if (tcpPacketData.headerIndex != 0)
-                    {
-                        receiveFilter.CheckUnknownPacket(tcpPacketData.headerBuffer, out tcpPacketData.socketError);
-                        Disconnect(tcpPacketData.socketError);
-                        return;
-                    }
+                    Disconnect(tcpPacketData.socketError);
+                    return;
                 }
-            }
-            else
-            {
-                Disconnect(tcpPacketData.socketError);
-                return;
-            }
 
-            await UniTask.NextFrame();
-            ReceiveData(token).Forget();
+                await UniTask.NextFrame();
+            }
         }
 
         public void Send(T packet)

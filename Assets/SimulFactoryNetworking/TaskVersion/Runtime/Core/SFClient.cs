@@ -1,5 +1,6 @@
 using System;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
@@ -15,7 +16,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
         protected int receiveTimeOut;
         protected int sendTimeOut;
         public event EventHandler<ConnectEventArgs> Conneted;
-        protected Task receiveTask;
+        protected CancellationTokenSource cancellationTokenSource;
 
         public bool IsConnected => socket.Connected;
 
@@ -33,7 +34,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
         {
             if(connectEventArgs.isConnected)
             {
-                receiveTask = Task.Run(async () => await Receive());
+                Task.Run(async () => await Receive(cancellationTokenSource.Token));
             }
         }
         public void Connect(string uri, int port)
@@ -89,8 +90,12 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
 
         public virtual void Dispose()
         {
-            receiveTask.Dispose();
-            receiveTask = null;
+            if(cancellationTokenSource == null || cancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+
+            cancellationTokenSource.Cancel();
         }
 
         protected async Task Send(byte[] bytes) 
@@ -98,7 +103,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
             socket.Send(bytes);
         }
 
-        protected abstract Task Receive();
+        protected abstract Task Receive(CancellationToken cancelToken);
 
         public void SetConnectTimeOut(int miliseconds) => connectTimeout = miliseconds;
 
