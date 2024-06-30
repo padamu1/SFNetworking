@@ -34,6 +34,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
         {
             if(connectEventArgs.isConnected)
             {
+                cancellationTokenSource = new CancellationTokenSource();
                 Task.Run(async () => await Receive(cancellationTokenSource.Token));
             }
         }

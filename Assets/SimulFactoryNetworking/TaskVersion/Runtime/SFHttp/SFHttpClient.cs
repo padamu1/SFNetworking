@@ -5,6 +5,7 @@ using SimulFactoryNetworking.TaskVersion.Runtime.SFHttp.Data;
 using System;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SimulFactoryNetworking.TaskVersion.Runtime.SFHttp
@@ -31,11 +32,12 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFHttp
         {
             if (connectEventArgs.isConnected)
             {
+                cancellationTokenSource = new CancellationTokenSource();
                 Task t = Task.Run(
                     async () => 
                     {
                         await base.Send(request.GetHttpRequest());
-                        await Receive();
+                        await Receive(cancellationTokenSource.Token);
                     });
             }
         }
@@ -45,7 +47,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFHttp
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         }
 
-        protected override async Task Receive()
+        protected override async Task Receive(CancellationToken token)
         {
             byte[] recvBuff = new byte[socket.ReceiveBufferSize];
 
@@ -54,7 +56,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFHttp
 
             if (socketError == SocketError.TimedOut)
             {
-                await Receive();
+                await Receive(cancellationTokenSource.Token);
                 return;
             }
 
