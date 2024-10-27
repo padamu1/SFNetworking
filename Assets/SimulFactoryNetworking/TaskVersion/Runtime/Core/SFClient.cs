@@ -99,9 +99,17 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.Core
             cancellationTokenSource.Cancel();
         }
 
-        protected async Task Send(byte[] bytes) 
+        public void Send(ReadOnlyMemory<byte> bytes) 
         {
-            socket.Send(bytes);
+            if (IsConnected)
+            {
+                socket.Send(bytes.Span, SocketFlags.None, out SocketError socketError);
+
+                if (socketError != SocketError.Success)
+                {
+                    Disconnect(socketError);
+                }
+            }
         }
 
         protected abstract Task Receive(CancellationToken cancelToken);

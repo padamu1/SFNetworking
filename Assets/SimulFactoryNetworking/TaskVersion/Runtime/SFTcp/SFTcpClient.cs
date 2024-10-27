@@ -16,11 +16,13 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFTcp
         private Queue<T> receivePacketQueue;
         private IReceiveFilter receiveFilter;
         private TcpPacketData tcpPacketData;
+        private int receiveDelayMilliSeconds;
 
-        public SFTcpClient(int headerBufferSize, IReceiveFilter receiveFilter, ISerializer<T> serializer) : base()
+        public SFTcpClient(int headerBufferSize, int receiveDelayMilliSeconds, IReceiveFilter receiveFilter, ISerializer<T> serializer) : base()
         {
             this.receiveFilter = receiveFilter;
             this.serializer = serializer;
+            this.receiveDelayMilliSeconds = receiveDelayMilliSeconds;
             tcpPacketData = new TcpPacketData(8096, headerBufferSize);
         }
 
@@ -81,7 +83,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFTcp
                     return;
                 }
 
-                await Task.Delay(10);
+                await Task.Delay(receiveDelayMilliSeconds);
             }
         }
 
@@ -89,12 +91,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFTcp
         {
             byte[] bytes = serializer.Serialize(packet);
 
-            Task.Run(async () => await base.Send(bytes));
-        }
-
-        new public void Send(byte[] bytes)
-        {
-            Task.Run(async () => await base.Send(bytes));
+            base.Send(bytes);
         }
 
         public int CheckData()

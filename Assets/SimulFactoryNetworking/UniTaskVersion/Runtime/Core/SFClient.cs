@@ -91,9 +91,17 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Core
 
         public virtual void Dispose() => cancelTokenSource.Cancel();
 
-        protected async UniTask Send(byte[] bytes) 
-        {
-            socket.Send(bytes);
+        public void Send(ReadOnlyMemory<byte> bytes)
+        { 
+            if (IsConnected)
+            {
+                socket.Send(bytes.Span, SocketFlags.None, out SocketError socketError);
+
+                if (socketError != SocketError.Success)
+                {
+                    Disconnect(socketError);
+                }
+            }
         }
 
         protected abstract UniTask Receive(CancellationToken cancellationToken);
