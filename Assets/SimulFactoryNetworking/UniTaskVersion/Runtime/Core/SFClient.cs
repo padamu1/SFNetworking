@@ -18,7 +18,7 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Core
         public event EventHandler<ConnectEventArgs> Conneted;
         protected CancellationTokenSource cancelTokenSource;
 
-        public bool IsConnected => socket.Connected;
+        public bool IsConnected => socket == null || socket.Connected;
 
         public SFClient()
         {
@@ -97,7 +97,7 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Core
             {
                 socket.Send(bytes.Span, SocketFlags.None, out SocketError socketError);
 
-                if (socketError != SocketError.Success)
+                if (CheckExceptionSocketError(socketError))
                 {
                     Disconnect(socketError);
                 }
@@ -111,5 +111,15 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.Core
         public void SetReciveTimeOut(int miliseconds) => receiveTimeOut = miliseconds;
 
         public void SetSendTimeOut(int miliseconds) => sendTimeOut = miliseconds;
+
+        protected bool CheckExceptionSocketError(SocketError socketError)
+        {
+            if (socketError == SocketError.OperationAborted || socketError == SocketError.ConnectionAborted || socketError == SocketError.ConnectionReset)
+            {
+                return true;
+            }
+
+            return false;
+        }
     }
 }

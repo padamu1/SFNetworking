@@ -40,47 +40,38 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
         {
             tcpPacketData.socketError = SocketError.Success;
 
-            tcpPacketData.lastDataCheckedTime = DateTime.Now;
-
             while (!token.IsCancellationRequested)
             {
                 tcpPacketData.receiveLength = socket.Receive(tcpPacketData.receiveBuffer, 0, tcpPacketData.receiveBuffer.Length, SocketFlags.None, out tcpPacketData.socketError);
 
-                // Success => 수신에 이상 없음
-                // WouldBlock => 수신에 이상은 없으나, 뒤에 추가 데이터가 남아있음
-                if (tcpPacketData.socketError == SocketError.Success || tcpPacketData.socketError == SocketError.WouldBlock)
+                if (IsConnected == false)
                 {
-                    if (tcpPacketData.receiveLength > 0)
-                    {
-                        tcpPacketData.currentIndex = 0;
-                        while (tcpPacketData.currentIndex < tcpPacketData.receiveLength)
-                        {
-                            TcpFilterModules.Filter(receiveFilter, tcpPacketData);
-
-                            if (tcpPacketData.headerIndex == 0 && tcpPacketData.currentPacketLength == tcpPacketData.totalPacketLength)
-                            {
-                                T packetData = serializer.Deserialize(tcpPacketData.packet);
-                                if (packetData != null)
-                                {
-                                    receivePacketQueue.Enqueue(packetData);
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (tcpPacketData.headerIndex != 0)
-                        {
-                            receiveFilter.CheckUnknownPacket(tcpPacketData.headerBuffer, out tcpPacketData.socketError);
-                            Disconnect(tcpPacketData.socketError);
-                            return;
-                        }
-                    }
+                    Disconnect(SocketError.NotConnected);
+                    return;
                 }
-                else
+
+                if (CheckExceptionSocketError(tcpPacketData.socketError))
                 {
                     Disconnect(tcpPacketData.socketError);
                     return;
+                }
+
+                if (tcpPacketData.receiveLength > 0)
+                {
+                    tcpPacketData.currentIndex = 0;
+                    while (tcpPacketData.currentIndex < tcpPacketData.receiveLength)
+                    {
+                        TcpFilterModules.Filter(receiveFilter, tcpPacketData);
+
+                        if (tcpPacketData.headerIndex == 0 && tcpPacketData.currentPacketLength == tcpPacketData.totalPacketLength)
+                        {
+                            T packetData = serializer.Deserialize(tcpPacketData.packet);
+                            if (packetData != null)
+                            {
+                                receivePacketQueue.Enqueue(packetData);
+                            }
+                        }
+                    }
                 }
 
                 await UniTask.Delay(receiveDelayMilliSeconds);
@@ -96,13 +87,6 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
 
         public int CheckData()
         {
-            if ((DateTime.Now - tcpPacketData.lastDataCheckedTime).TotalMilliseconds > socket.ReceiveTimeout)
-            {
-                tcpPacketData.socketError = SocketError.TimedOut;
-                Disconnect(tcpPacketData.socketError);
-                return 0;
-            }
-            tcpPacketData.lastDataCheckedTime = DateTime.Now;
             return receivePacketQueue.Count;
         }
 

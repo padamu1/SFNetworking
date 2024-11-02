@@ -34,7 +34,7 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp
                 UniTask t = UniTask.Create(
                     async () => 
                     {
-                        await base.Send(request.GetHttpRequest());
+                        base.Send(request.GetHttpRequest());
                         await Receive(cancelTokenSource.Token);
                     });
             }

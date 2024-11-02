@@ -36,7 +36,7 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFHttp
                 Task t = Task.Run(
                     async () => 
                     {
-                        await base.Send(request.GetHttpRequest());
+                        base.Send(request.GetHttpRequest());
                         await Receive(cancellationTokenSource.Token);
                     });
             }

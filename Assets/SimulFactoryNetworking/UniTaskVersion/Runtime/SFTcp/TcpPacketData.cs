@@ -18,8 +18,6 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFTcp
         public int totalPacketLength;
         public SocketError socketError;
 
-        public DateTime lastDataCheckedTime;
-
         public TcpPacketData(int bufferSize, int headerBufferSize)
         {
             this.bufferSize = bufferSize;
