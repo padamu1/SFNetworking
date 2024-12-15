@@ -11,18 +11,20 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp
 {
     public class SFHttpClient<T> : SFClient
     {
-        private Action<SFHttpResponse<T>> callback;
+        private Func<SFHttpResponse<T>, UniTask> callback;
         private SFHttpRequest request;
+        private Func<float, UniTask> progress;
 
-        private SFHttpClient(SFHttpRequest request, Action<SFHttpResponse<T>> callback) : base()
+        private SFHttpClient(SFHttpRequest request, Func<SFHttpResponse<T>, UniTask> callback, Func<float, UniTask> progress) : base()
         {
             this.request = request;
             this.callback = callback;
+            this.progress = progress;
         }
 
-        public static void Send(SFHttpRequest request, Action<SFHttpResponse<T>> callback)
+        public static void Send(SFHttpRequest request, Func<SFHttpResponse<T>, UniTask> callback, Func<float, UniTask> progress)
         {
-            SFHttpClient<T> httpClient = new SFHttpClient<T>(request, callback);
+            SFHttpClient<T> httpClient = new SFHttpClient<T>(request, callback, progress);
             httpClient.SetConnectTimeOut(request.GetTimeOut());
             httpClient.Connect(request.GetHost(), request.GetPort());
         }
@@ -43,11 +45,14 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp
         protected override void SetSocket()
         {
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            socket.ReceiveTimeout = 30000;
+            socket.SendTimeout = 30000;
         }
 
         protected override async UniTask Receive(CancellationToken cancellationToken)
         {
-            byte[] recvBuff = new byte[socket.ReceiveBufferSize];
+            await UniTask.SwitchToThreadPool();
+            byte[] recvBuff = new byte[1000000];
 
             // Header Data
             int nCount = socket.Receive(recvBuff, 0, recvBuff.Length, SocketFlags.None, out SocketError socketError);
@@ -73,17 +78,32 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp
                     string temp = Encoding.ASCII.GetString(recvBuff, 0, count);
 
                     httpResponse.AddBody(temp);
+
+                    if(progress != null)
+                    {
+                        UniTask.Create(async () =>
+                        {
+                            await UniTask.SwitchToMainThread();
+                            await progress(httpResponse.GetBody().Length / (float)length);
+                        }).Forget();
+                    }
+                    await UniTask.NextFrame();
                 }
             }
 
-            if (httpResponse.TryGetHeader("Content-Type", out string contentType) && contentType == HttpContentType.ApplicationJson)
+            socket.Close();
+
+            if (httpResponse.GetStatusCode() == 200 && httpResponse.TryGetHeader("Content-Type", out string contentType) && contentType == HttpContentType.ApplicationJson)
             {
-                httpResponse.ConvertToJson();
+                await httpResponse.ConvertToJson();
             }
 
-            callback(httpResponse);
+            await UniTask.SwitchToMainThread();
 
-            socket.Close();
+            if(httpResponse.GetStatusCode() == 200)
+            {
+                await callback(httpResponse);
+            }
         }
 
         protected virtual SFHttpResponse<T> ParseData(string result)

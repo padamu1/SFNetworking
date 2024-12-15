@@ -1,7 +1,5 @@
 ﻿using SimulFactoryNetworking.UniTaskVersion.Runtime.Common;
-using System.Net;
 using System.Text;
-using UnityEditor.PackageManager.Requests;
 
 namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp.Data
 {

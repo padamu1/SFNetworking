@@ -1,7 +1,10 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using Cysharp.Threading.Tasks;
+using Newtonsoft.Json;
+using SimulFactoryNetworking.UniTaskVersion.Runtime.Core;
+using System.Collections.Generic;
+using System.IO;
 using System.Text;
-using Unity.Plastic.Newtonsoft.Json;
+using UnityEngine;
 
 namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp.Data
 {
@@ -61,7 +64,7 @@ namespace SimulFactoryNetworking.UniTaskVersion.Runtime.SFHttp.Data
             return body.ToString();
         }
 
-        public void ConvertToJson()
+        public async UniTask ConvertToJson()
         {
             data = JsonConvert.DeserializeObject<T>(body.ToString());
         }
