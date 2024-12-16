@@ -42,7 +42,18 @@ namespace SimulFactoryNetworking.TaskVersion.Runtime.SFTcp
 
             while (!token.IsCancellationRequested)
             {
-                tcpPacketData.receiveLength = await socket.ReceiveAsync(tcpPacketData.receiveBuffer, SocketFlags.None);
+                try
+                {
+                    tcpPacketData.receiveLength = await socket.ReceiveAsync(tcpPacketData.receiveBuffer, SocketFlags.None);
+                }
+                catch (Exception e)
+                {
+                    if (IsConnected)
+                    {
+                        Disconnect(SocketError.NotConnected);
+                    }
+                    return;
+                }
 
                 if (tcpPacketData.receiveLength == 0)
                 {
