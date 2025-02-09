@@ -51,6 +51,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
 
             if (socket.ReceiveAsync(receiveArgs) == false)
             {
+                SocketReceiveEvent(this, receiveArgs);
                 return;
             }
         }
