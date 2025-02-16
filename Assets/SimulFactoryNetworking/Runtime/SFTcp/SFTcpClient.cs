@@ -1,6 +1,7 @@
 ﻿using SimulFactoryNetworking.Unity6.Runtime.Common;
 using SimulFactoryNetworking.Unity6.Runtime.Core;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using UnityEngine;
@@ -12,7 +13,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
         public event EventHandler<DisconnectEventArgs> Disconnected;
 
         private ISerializer<T> serializer;
-        private Queue<T> receivePacketQueue;
+        private ConcurrentQueue<T> receivePacketQueue;
         private IReceiveFilter receiveFilter;
         private TcpPacketData tcpPacketData;
         private int receiveDelayMilliSeconds;
@@ -33,7 +34,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
             socket.NoDelay = true;
             socket.ReceiveTimeout = 30000;
             socket.SendTimeout = 30000;
-            receivePacketQueue = new Queue<T>();
+            receivePacketQueue = new ConcurrentQueue<T>();
 
             receiveArgs = new SocketAsyncEventArgs();
             receiveArgs.Completed += SocketReceiveEvent;
@@ -105,9 +106,15 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
             return receivePacketQueue.Count;
         }
 
-        public T GetData()
+        public bool GetData(out T data)
         {
-            return receivePacketQueue.Dequeue();
+            if (receivePacketQueue.TryDequeue(out T peek))
+            {
+                data = peek;
+                return true;
+            }
+            data = default;
+            return false;
         }
 
         public override void Disconnect(SocketError socketError = SocketError.Success)
