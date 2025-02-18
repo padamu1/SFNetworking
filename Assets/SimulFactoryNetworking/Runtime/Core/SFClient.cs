@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Threading;
 using UnityEngine;
@@ -18,6 +19,10 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         public event EventHandler<ConnectEventArgs> Conneted;
         protected CancellationTokenSource cancellationTokenSource;
 
+        private SocketAsyncEventArgs sendAsyncArgs;
+        private ConcurrentQueue<ArraySegment<byte>> sendQueue = new ConcurrentQueue<ArraySegment<byte>>();
+        private int sendTaskRun;
+
         public bool IsConnected => socket == null || socket.Connected;
 
         public SFClient()
@@ -27,6 +32,9 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             socket.SendTimeout = 1000;
             Conneted -= OnConnected;
             Conneted += OnConnected;
+
+            sendAsyncArgs = new SocketAsyncEventArgs();
+            sendAsyncArgs.Completed += OnSend;
         }
 
         protected abstract void SetSocket();
@@ -105,19 +113,47 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             cancellationTokenSource.Cancel();
         }
 
-        public void Send(ReadOnlyMemory<byte> bytes)
+        public void Send(ArraySegment<byte> bytes)
         {
             if (IsConnected)
             {
-                socket.Send(bytes.Span, SocketFlags.None, out SocketError socketError);
-
-                if (CheckExceptionSocketError(socketError))
-                {
-                    Disconnect(socketError);
-                }
+                sendQueue.Enqueue(bytes);
             }
+
+            if (Interlocked.Exchange(ref sendTaskRun, 1) == 1)
+            {
+                return;
+            }
+
+            Awaitable.BackgroundThreadAsync().OnCompleted(SendProcess);
         }
 
+        private void SendProcess()
+        {
+            if (sendQueue.TryDequeue(out ArraySegment<byte> packet))
+            {
+                sendAsyncArgs.SetBuffer(packet);
+                if (socket.SendAsync(sendAsyncArgs) == false)
+                {
+                    OnSend(this, sendAsyncArgs);
+                }
+
+                return;
+            }
+
+            Interlocked.Exchange(ref sendTaskRun, 0);
+        }
+
+        private void OnSend(object? sender, SocketAsyncEventArgs e)
+        {
+            if (CheckExceptionSocketError(e.SocketError))
+            {
+                Disconnect();
+                return;
+            }
+
+            SendProcess();
+        }
 
         protected virtual async Awaitable RunReceiveBackGround()
         {
