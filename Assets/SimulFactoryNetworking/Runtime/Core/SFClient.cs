@@ -125,20 +125,27 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                 return;
             }
 
-            Awaitable.BackgroundThreadAsync().OnCompleted(SendProcess);
+            SendProcess();
         }
 
         private void SendProcess()
         {
             if (sendQueue.TryDequeue(out ArraySegment<byte> packet))
             {
-                sendAsyncArgs.SetBuffer(packet);
-                if (socket.SendAsync(sendAsyncArgs) == false)
+                try
                 {
-                    OnSend(this, sendAsyncArgs);
-                }
+                    sendAsyncArgs.SetBuffer(packet);
+                    if (socket.SendAsync(sendAsyncArgs) == false)
+                    {
+                        OnSend(this, sendAsyncArgs);
+                    }
 
-                return;
+                    return;
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError(e);
+                }
             }
 
             Interlocked.Exchange(ref sendTaskRun, 0);
