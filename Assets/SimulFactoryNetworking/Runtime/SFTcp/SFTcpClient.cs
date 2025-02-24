@@ -31,9 +31,10 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
         {
             socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             socket.Blocking = false;
-            socket.NoDelay = true;
             socket.ReceiveTimeout = 30000;
             socket.SendTimeout = 30000;
+            socket.ReceiveBufferSize = 8096;
+            socket.NoDelay = true;
             receivePacketQueue = new ConcurrentQueue<T>();
 
             receiveArgs = new SocketAsyncEventArgs();
@@ -48,12 +49,17 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
 
         protected override void Receive()
         {
+            if (IsConnected == false)
+            {
+                Disconnect(SocketError.NotConnected);
+                return;
+            }
+
             if (cancellationTokenSource.IsCancellationRequested) return;
 
             if (socket.ReceiveAsync(receiveArgs) == false)
             {
                 SocketReceiveEvent(this, receiveArgs);
-                return;
             }
         }
 
@@ -67,9 +73,15 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
                 return;
             }
 
+            if (args.SocketError != SocketError.Success && args.SocketError != SocketError.WouldBlock)
+            {
+                Receive();
+                return;
+            }
+
             if (tcpPacketData.receiveLength == 0)
             {
-                Disconnect(SocketError.NotConnected);
+                Disconnect(SocketError.NoData);
                 return;
             }
 
@@ -88,10 +100,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
                 }
             }
 
-            if (IsConnected)
-            {
-                Receive();
-            }
+            Receive();
         }
 
         public void Send(T packet)
