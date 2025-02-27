@@ -171,6 +171,11 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                 return;
             }
 
+            if (cancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+
             if (e.BytesTransferred > 0)
             {
                 bytesSent += e.BytesTransferred;
