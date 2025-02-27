@@ -20,7 +20,10 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         protected CancellationTokenSource cancellationTokenSource;
 
         private SocketAsyncEventArgs sendAsyncArgs;
-        private ConcurrentQueue<ArraySegment<byte>> sendQueue = new ConcurrentQueue<ArraySegment<byte>>();
+        private ConcurrentQueue<byte[]> sendQueue = new ConcurrentQueue<byte[]>();
+        private byte[] sendBuffer;
+        private int bytesSent;
+
         private int sendTaskRun;
 
         public bool IsConnected => socket == null || socket.Connected;
@@ -113,7 +116,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             cancellationTokenSource.Cancel();
         }
 
-        public void Send(ArraySegment<byte> bytes)
+        public void Send(byte[] bytes)
         {
             if (IsConnected)
             {
@@ -130,25 +133,34 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
 
         private void SendProcess()
         {
-            if (sendQueue.TryDequeue(out ArraySegment<byte> packet))
-            {
-                try
-                {
-                    sendAsyncArgs.SetBuffer(packet);
-                    if (socket.SendAsync(sendAsyncArgs) == false)
-                    {
-                        OnSend(this, sendAsyncArgs);
-                    }
+            bytesSent = 0;
 
-                    return;
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError(e);
-                }
+            if (sendQueue.TryDequeue(out sendBuffer))
+            {
+                TrySend();
+            }
+            else
+            {
+                Interlocked.Exchange(ref sendTaskRun, 0);
+            }
+        }
+
+        private void TrySend()
+        {
+            int remaining = sendBuffer.Length - bytesSent;
+            if (remaining <= 0)
+            {
+                SendProcess();
+                return;
             }
 
-            Interlocked.Exchange(ref sendTaskRun, 0);
+            sendAsyncArgs.SetBuffer(sendBuffer, bytesSent, remaining);
+
+            bool willRaiseEvent = socket.SendAsync(sendAsyncArgs);
+            if (!willRaiseEvent)
+            {
+                OnSend(socket, sendAsyncArgs);
+            }
         }
 
         private void OnSend(object? sender, SocketAsyncEventArgs e)
@@ -159,8 +171,25 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                 return;
             }
 
-            SendProcess();
+            if (e.BytesTransferred > 0)
+            {
+                bytesSent += e.BytesTransferred;
+
+                if (bytesSent < sendBuffer.Length)
+                {
+                    TrySend();
+                }
+                else
+                {
+                    SendProcess();
+                }
+            }
+            else
+            {
+                TrySend();
+            }
         }
+
 
         protected virtual async Awaitable RunReceiveBackGround()
         {
