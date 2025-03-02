@@ -36,12 +36,16 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp
             if (connectEventArgs.isConnected)
             {
                 cancellationTokenSource = new CancellationTokenSource();
-                base.Send(request.GetHttpRequest());
                 buffer = new byte[socket.ReceiveBufferSize];
                 receiveArgs = new SocketAsyncEventArgs();
                 receiveArgs.SetBuffer(buffer);
                 receiveArgs.Completed += SocketReceiveEvent;
+
                 base.OnConnected(sender, connectEventArgs);
+
+                socket.Send(request.GetHttpRequest(), SocketFlags.None, out SocketError errorCode);
+
+                Debug.Log($"socket Send status : {errorCode.ToString()}");
             }
         }
 
@@ -52,16 +56,42 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp
 
         protected override void Receive()
         {
-            // Header Data
-            socket.ReceiveAsync(receiveArgs);
+            if (socket.ReceiveAsync(receiveArgs) == false)
+            {
+                SocketReceiveEvent(this, receiveArgs);
+            }
         }
 
         protected override void SocketReceiveEvent(object sender, SocketAsyncEventArgs args)
         {
+            if (cancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (CheckExceptionSocketError(args.SocketError))
+            {
+                Disconnect(args.SocketError);
+                return;
+            }
+
+            if (SocketError.Success != args.SocketError && SocketError.WouldBlock != args.SocketError)
+            {
+                Receive();
+                return;
+            }
+
             int receiveBytes = args.BytesTransferred;
+
+            if (receiveBytes == 0)
+            {
+                Disconnect();
+                return;
+            }
+
             if (httpResponse == null)
             {
-                string result = Encoding.ASCII.GetString(buffer, 0, receiveBytes);
+                string result = Encoding.UTF8.GetString(buffer, 0, receiveBytes);
                 httpResponse = new SFHttpResponse<T>(result);
 
                 if (httpResponse.GetContentLength() > 0)
@@ -72,10 +102,9 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp
             }
             else
             {
-
                 if (receiveBytes > 0)
                 {
-                    httpResponse.AddBody(Encoding.ASCII.GetString(buffer, 0, receiveBytes));
+                    httpResponse.AddBody(Encoding.UTF8.GetString(buffer, 0, receiveBytes));
                 }
 
                 if (progress != null)
@@ -95,8 +124,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp
                 httpResponse.ConvertToJson();
             }
 
-            socket.Close();
-            Dispose();
+            Disconnect();
 
             _ = callback(httpResponse);
         }
