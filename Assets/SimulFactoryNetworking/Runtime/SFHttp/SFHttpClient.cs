@@ -28,7 +28,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp
         {
             SFHttpClient<T> httpClient = new SFHttpClient<T>(request, callback, progress);
             httpClient.SetConnectTimeOut(request.GetTimeOut());
-            httpClient.Connect(request.GetHost(), request.GetPort());
+            httpClient.Connect(request.GetHost(), request.GetPort(), 10);
         }
 
         protected override void OnConnected(object sender, ConnectEventArgs connectEventArgs)

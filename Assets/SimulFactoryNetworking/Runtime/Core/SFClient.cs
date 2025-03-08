@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace SimulFactoryNetworking.Unity6.Runtime.Core
@@ -23,8 +24,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         private ConcurrentQueue<byte[]> sendQueue = new ConcurrentQueue<byte[]>();
         private byte[] sendBuffer;
         private int bytesSent;
-
-        private int sendTaskRun;
+        private int sendDelay;
 
         public bool IsConnected => socket == null || socket.Connected;
 
@@ -51,8 +51,9 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             }
         }
 
-        public void Connect(string uri, int port)
+        public void Connect(string uri, int port, int sendDelay)
         {
+            this.sendDelay = sendDelay;
             _ = ToConnect(uri, port);
         }
 
@@ -122,27 +123,35 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             {
                 sendQueue.Enqueue(bytes);
             }
-
-            if (Interlocked.Exchange(ref sendTaskRun, 1) == 1)
-            {
-                return;
-            }
-
-            SendProcess();
         }
 
         private void SendProcess()
         {
+            if (IsConnected == false || cancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+
+
             bytesSent = 0;
 
             if (sendQueue.TryDequeue(out sendBuffer))
             {
                 TrySend();
+                return;
             }
-            else
+
+            Task.Run(SendWaitTask);
+        }
+
+        private async Task SendWaitTask()
+        {
+            while (cancellationTokenSource.IsCancellationRequested == false && sendQueue.IsEmpty)
             {
-                Interlocked.Exchange(ref sendTaskRun, 0);
+                await Task.Delay(sendDelay);
             }
+
+            SendProcess();
         }
 
         private void TrySend()
@@ -168,11 +177,6 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             if (CheckExceptionSocketError(e.SocketError))
             {
                 Disconnect();
-                return;
-            }
-
-            if (cancellationTokenSource.IsCancellationRequested)
-            {
                 return;
             }
 
