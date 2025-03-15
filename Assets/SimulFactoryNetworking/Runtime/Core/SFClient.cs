@@ -34,8 +34,6 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         public SFClient()
         {
             SetSocket();
-            socket.ReceiveTimeout = 1000;
-            socket.SendTimeout = 1000;
             Conneted -= OnConnected;
             Conneted += OnConnected;
 
