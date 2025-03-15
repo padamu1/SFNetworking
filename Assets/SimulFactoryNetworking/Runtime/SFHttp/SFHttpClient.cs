@@ -51,11 +51,13 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp
 
         protected override void SetSocket()
         {
-            socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            socket.DualMode = true;
         }
 
         protected override void Receive()
         {
+            // Header Data
             if (socket.ReceiveAsync(receiveArgs) == false)
             {
                 SocketReceiveEvent(this, receiveArgs);
@@ -89,6 +91,8 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp
                 return;
             }
 
+            Debug.Log($"receive Bytes : {receiveBytes}");
+
             if (httpResponse == null)
             {
                 string result = Encoding.UTF8.GetString(buffer, 0, receiveBytes);
@@ -118,6 +122,8 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp
                     return;
                 }
             }
+
+            Debug.Log($"Http Request Status : {httpResponse.GetStatusCode()}");
 
             if (httpResponse.GetStatusCode() == 200 && httpResponse.TryGetHeader("Content-Type", out string contentType) && contentType == HttpContentType.ApplicationJson)
             {

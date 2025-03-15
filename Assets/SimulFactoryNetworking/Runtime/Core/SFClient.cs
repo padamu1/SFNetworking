@@ -24,9 +24,12 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         private ConcurrentQueue<byte[]> sendQueue = new ConcurrentQueue<byte[]>();
         private byte[] sendBuffer;
         private int bytesSent;
+
         private int sendDelay;
 
         public bool IsConnected => socket == null || socket.Connected;
+
+        private int isSent;
 
         public SFClient()
         {
@@ -37,6 +40,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             Conneted += OnConnected;
 
             sendAsyncArgs = new SocketAsyncEventArgs();
+            sendAsyncArgs.DisconnectReuseSocket = true;
             sendAsyncArgs.Completed += OnSend;
         }
 
@@ -47,7 +51,8 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             if (connectEventArgs.isConnected)
             {
                 cancellationTokenSource = new CancellationTokenSource();
-                _ = RunReceiveBackGround();
+
+                RunReceiveBackGround();
             }
         }
 
@@ -81,6 +86,8 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                 }
                 else
                 {
+                    LingerOption lingerOption = new LingerOption(true, 0);
+                    socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Linger, lingerOption);
                     break;
                 }
             }
@@ -104,7 +111,6 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         public virtual void Disconnect(SocketError socketError = SocketError.Success)
         {
             Dispose();
-            socket.Close();
         }
 
         public virtual void Dispose()
@@ -114,7 +120,10 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                 return;
             }
 
+            sendQueue.Clear();
+            sendAsyncArgs.Dispose();
             cancellationTokenSource.Cancel();
+            socket.Close();
         }
 
         public void Send(byte[] bytes)
@@ -122,6 +131,11 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             if (IsConnected)
             {
                 sendQueue.Enqueue(bytes);
+            }
+
+            if (Interlocked.Exchange(ref isSent, 1) == 0)
+            {
+                SendProcess();
             }
         }
 
@@ -132,7 +146,6 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                 return;
             }
 
-
             bytesSent = 0;
 
             if (sendQueue.TryDequeue(out sendBuffer))
@@ -141,17 +154,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                 return;
             }
 
-            Task.Run(SendWaitTask);
-        }
-
-        private async Task SendWaitTask()
-        {
-            while (cancellationTokenSource.IsCancellationRequested == false && sendQueue.IsEmpty)
-            {
-                await Task.Delay(sendDelay);
-            }
-
-            SendProcess();
+            Interlocked.Exchange(ref isSent, 0);
         }
 
         private void TrySend()
@@ -200,13 +203,11 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         }
 
 
-        protected virtual async Awaitable RunReceiveBackGround()
+        protected virtual void RunReceiveBackGround()
         {
-            await Awaitable.BackgroundThreadAsync();
-
             if (IsConnected)
             {
-                Receive();
+                Task.Run(Receive);
             }
         }
 
