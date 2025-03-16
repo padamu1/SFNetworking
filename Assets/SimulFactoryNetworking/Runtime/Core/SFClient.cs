@@ -41,6 +41,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             receiveTimeOut = 60000;
             sendTimeOut = 60000;
 
+            cancellationTokenSource = new CancellationTokenSource();
 
             sendAsyncArgs = new SocketAsyncEventArgs();
             sendAsyncArgs.DisconnectReuseSocket = true;
@@ -53,8 +54,6 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         {
             if (connectEventArgs.isConnected)
             {
-                cancellationTokenSource = new CancellationTokenSource();
-
                 RunReceiveBackGround();
             }
         }
@@ -71,7 +70,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             await Awaitable.BackgroundThreadAsync();
 
             DateTime connectStartTime = DateTime.Now;
-            while (socket.Connected == false)
+            while (socket.Connected == false && cancellationTokenSource.IsCancellationRequested == false)
             {
                 try
                 {
@@ -276,15 +275,27 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         /// </summary>
         public virtual void Dispose()
         {
-            if (cancellationTokenSource == null || cancellationTokenSource.IsCancellationRequested)
+            if (cancellationTokenSource.IsCancellationRequested)
             {
                 return;
             }
 
-            sendQueue.Clear();
-            sendAsyncArgs.Dispose();
+            if (sendQueue != null)
+            {
+                sendQueue.Clear();
+            }
+
+            if (sendAsyncArgs != null)
+            {
+                sendAsyncArgs.Dispose();
+            }
+
             cancellationTokenSource.Cancel();
-            socket.Close();
+
+            if (socket != null)
+            {
+                socket.Close();
+            }
         }
     }
 }

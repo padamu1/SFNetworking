@@ -155,7 +155,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
 
         public override void Disconnect(SocketError socketError = SocketError.Success)
         {
-            if (cancellationTokenSource == null || cancellationTokenSource.Token.IsCancellationRequested)
+            if (cancellationTokenSource.IsCancellationRequested)
             {
                 return;
             }
@@ -167,7 +167,11 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
 
         public override void Dispose()
         {
-            receiveArgs.Dispose();
+            if (receiveArgs != null)
+            {
+                receiveArgs.Dispose();
+            }
+
             base.Dispose();
         }
 
