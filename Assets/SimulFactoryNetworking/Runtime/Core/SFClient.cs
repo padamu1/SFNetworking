@@ -37,6 +37,11 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             Conneted -= OnConnected;
             Conneted += OnConnected;
 
+            connectTimeout = 60000;
+            receiveTimeOut = 60000;
+            sendTimeOut = 60000;
+
+
             sendAsyncArgs = new SocketAsyncEventArgs();
             sendAsyncArgs.DisconnectReuseSocket = true;
             sendAsyncArgs.Completed += OnSend;
@@ -80,14 +85,21 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                 if (socket.Connected == false)
                 {
                     socket.Close();
+
+                    if ((DateTime.Now - connectStartTime).TotalMilliseconds > connectTimeout)
+                    {
+                        break;
+                    }
+
+
                     SetSocket();
                 }
                 else
                 {
-                    LingerOption lingerOption = new LingerOption(true, 0);
-                    socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Linger, lingerOption);
                     break;
                 }
+
+                await Awaitable.WaitForSecondsAsync(100);
             }
 
             // Switch to main thread
@@ -111,19 +123,6 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             Dispose();
         }
 
-        public virtual void Dispose()
-        {
-            if (cancellationTokenSource == null || cancellationTokenSource.IsCancellationRequested)
-            {
-                return;
-            }
-
-            sendQueue.Clear();
-            sendAsyncArgs.Dispose();
-            cancellationTokenSource.Cancel();
-            socket.Close();
-        }
-
         public void Send(byte[] bytes)
         {
             if (IsConnected)
@@ -133,12 +132,14 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
 
             if (Interlocked.Exchange(ref isSent, 1) == 0)
             {
-                SendProcess();
+                _ = SendProcess();
             }
         }
 
-        private void SendProcess()
+        private async Awaitable SendProcess()
         {
+            await Awaitable.BackgroundThreadAsync();
+
             if (IsConnected == false || cancellationTokenSource.IsCancellationRequested)
             {
                 return;
@@ -155,12 +156,15 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             Interlocked.Exchange(ref isSent, 0);
         }
 
+        /// <summary>
+        /// try send before send all data
+        /// </summary>
         private void TrySend()
         {
             int remaining = sendBuffer.Length - bytesSent;
             if (remaining <= 0)
             {
-                SendProcess();
+                _ = SendProcess();
                 return;
             }
 
@@ -173,6 +177,11 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             }
         }
 
+        /// <summary>
+        /// On SendAsyncEventArgs complete
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void OnSend(object? sender, SocketAsyncEventArgs e)
         {
             if (CheckExceptionSocketError(e.SocketError))
@@ -191,7 +200,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                 }
                 else
                 {
-                    SendProcess();
+                    _ = SendProcess();
                 }
             }
             else
@@ -200,25 +209,58 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             }
         }
 
-
+        /// <summary>
+        /// Start Receive Method
+        /// </summary>
         protected virtual void RunReceiveBackGround()
         {
             if (IsConnected)
             {
-                Task.Run(Receive);
+                _ = Receive();
             }
         }
 
         protected abstract void SocketReceiveEvent(object sender, SocketAsyncEventArgs args);
 
-        protected abstract void Receive();
+        /// <summary>
+        /// Receive data with awaitable method
+        /// </summary>
+        /// <returns></returns>
+        protected abstract Awaitable Receive();
 
+        /// <summary>
+        /// Set connnect timeout <br />
+        /// Will reconnect to server when connect failed before connectTimeout <br />
+        /// default value is 60000
+        /// </summary>
+        /// <param name="miliseconds"></param>
         public void SetConnectTimeOut(int miliseconds) => connectTimeout = miliseconds;
 
-        public void SetReciveTimeOut(int miliseconds) => receiveTimeOut = miliseconds;
+        /// <summary>
+        /// Set receive Timeout <br />
+        /// default value is 60000
+        /// </summary>
+        public void SetReciveTimeOut(int miliseconds)
+        {
+            receiveTimeOut = miliseconds;
+            socket.ReceiveTimeout = receiveTimeOut;
+        }
 
-        public void SetSendTimeOut(int miliseconds) => sendTimeOut = miliseconds;
+        /// <summary>
+        /// Set send Timeout <br />
+        /// default value is 60000
+        /// </summary>
+        public void SetSendTimeOut(int miliseconds)
+        {
+            sendTimeOut = miliseconds;
+            socket.SendTimeout = sendTimeOut;
+        }
 
+        /// <summary>
+        /// Check socket error
+        /// </summary>
+        /// <param name="socketError"></param>
+        /// <returns></returns>
         protected bool CheckExceptionSocketError(SocketError socketError)
         {
             if (socketError == SocketError.OperationAborted || socketError == SocketError.ConnectionAborted || socketError == SocketError.ConnectionReset || socketError == SocketError.NotConnected || socketError == SocketError.ConnectionRefused)
@@ -227,6 +269,22 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Dispose socket
+        /// </summary>
+        public virtual void Dispose()
+        {
+            if (cancellationTokenSource == null || cancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+
+            sendQueue.Clear();
+            sendAsyncArgs.Dispose();
+            cancellationTokenSource.Cancel();
+            socket.Close();
         }
     }
 }

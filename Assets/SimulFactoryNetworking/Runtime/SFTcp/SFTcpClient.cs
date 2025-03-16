@@ -23,19 +23,23 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
             this.receiveFilter = receiveFilter;
             this.serializer = serializer;
             this.receiveDelayMilliSeconds = receiveDelayMilliSeconds;
-            tcpPacketData = new TcpPacketData(16384, headerBufferSize);
+            tcpPacketData = new TcpPacketData(8192, headerBufferSize);
         }
 
+        /// <summary>
+        /// Set Socket Option for tcp socket networking
+        /// </summary>
         protected override void SetSocket()
         {
             socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             socket.DualMode = true;
 
-            socket.ReceiveTimeout = 60000; // 60초
-            socket.SendTimeout = 60000; // 60초
+            socket.ReceiveTimeout = receiveTimeOut;
+            socket.SendTimeout = sendTimeOut;
 
             Debug.Log($"Buffer size : {socket.ReceiveBufferSize}");
             socket.ReceiveBufferSize = Math.Min(socket.ReceiveBufferSize, 8192);
+            socket.SendBufferSize = 8192;
 
             socket.Blocking = false;
             socket.NoDelay = true;
@@ -46,22 +50,31 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
             receiveArgs.Completed += SocketReceiveEvent;
         }
 
+        /// <summary>
+        /// Set Socket keep alive option
+        /// </summary>
         protected override void RunReceiveBackGround()
         {
+            // keep alive
             byte[] keepAlive = new byte[12];
-            BitConverter.GetBytes((uint)1).CopyTo(keepAlive, 0);   // 활성화 (1)
-            BitConverter.GetBytes((uint)15000).CopyTo(keepAlive, 4); // 15초 동안 응답이 없으면 패킷 전송
-            BitConverter.GetBytes((uint)5000).CopyTo(keepAlive, 8); // 5초마다 다시 체크
-
+            BitConverter.GetBytes((uint)1).CopyTo(keepAlive, 0);
+            BitConverter.GetBytes((uint)15000).CopyTo(keepAlive, 4);
+            BitConverter.GetBytes((uint)5000).CopyTo(keepAlive, 8);
             socket.IOControl(IOControlCode.KeepAliveValues, keepAlive, null);
 
+            // reuse socket
             receiveArgs.DisconnectReuseSocket = true;
+
+            // set buffer
             receiveArgs.SetBuffer(tcpPacketData.receiveBuffer);
             base.RunReceiveBackGround();
         }
 
-        protected override void Receive()
+        protected override async Awaitable Receive()
         {
+            // receive data on backgroudnthread
+            await Awaitable.BackgroundThreadAsync();
+
             if (IsConnected == false)
             {
                 Disconnect(SocketError.NotConnected);
@@ -88,7 +101,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
 
             if (args.SocketError != SocketError.WouldBlock && args.SocketError != SocketError.Success)
             {
-                Receive();
+                _ = Receive();
                 return;
             }
 
@@ -113,7 +126,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
                 }
             }
 
-            Receive();
+            _ = Receive();
         }
 
         public void Send(T packet)

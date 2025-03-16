@@ -55,8 +55,10 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp
             socket.DualMode = true;
         }
 
-        protected override void Receive()
+        protected override async Awaitable Receive()
         {
+            await Awaitable.BackgroundThreadAsync();
+
             // Header Data
             if (socket.ReceiveAsync(receiveArgs) == false)
             {
@@ -79,7 +81,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp
 
             if (SocketError.Success != args.SocketError && SocketError.WouldBlock != args.SocketError)
             {
-                Receive();
+                _ = Receive();
                 return;
             }
 
@@ -100,7 +102,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp
 
                 if (httpResponse.GetContentLength() > 0)
                 {
-                    Receive();
+                    _ = Receive();
                     return;
                 }
             }
@@ -118,7 +120,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp
 
                 if (httpResponse.GetBodyLength() < httpResponse.GetContentLength())
                 {
-                    Receive();
+                    _ = Receive();
                     return;
                 }
             }
