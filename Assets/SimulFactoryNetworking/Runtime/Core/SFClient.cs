@@ -1,6 +1,7 @@
 using Codice.Client.Common;
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -71,12 +72,9 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             // Switch to background thread
             await Awaitable.BackgroundThreadAsync();
 
-            IPAddress ipAddress;
-            if (!IPAddress.TryParse(uri, out ipAddress))
-            {
-                IPAddress[] addresses = await Dns.GetHostAddressesAsync(uri);
-                ipAddress = addresses[0];
-            }
+            IPAddress[] addresses = await Dns.GetHostAddressesAsync(uri);
+            IPAddress ipAddress = addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetworkV6)
+                                  ?? addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork);
             IPEndPoint iPEndPoint = new IPEndPoint(ipAddress, port);
 
             DateTime connectStartTime = DateTime.Now;
@@ -100,6 +98,8 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                         break;
                     }
 
+                    // if connect failed switch to v4 network
+                    iPEndPoint = new IPEndPoint(addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork), port);
 
                     SetSocket();
                 }
