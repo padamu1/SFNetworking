@@ -1,8 +1,10 @@
+using Codice.Client.Common;
 using System;
 using System.Collections.Concurrent;
+using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading;
-using System.Threading.Tasks;
 using UnityEngine;
 
 namespace SimulFactoryNetworking.Unity6.Runtime.Core
@@ -44,7 +46,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             cancellationTokenSource = new CancellationTokenSource();
 
             sendAsyncArgs = new SocketAsyncEventArgs();
-            sendAsyncArgs.DisconnectReuseSocket = true;
+            sendAsyncArgs.DisconnectReuseSocket = false;
             sendAsyncArgs.Completed += OnSend;
         }
 
@@ -69,12 +71,20 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             // Switch to background thread
             await Awaitable.BackgroundThreadAsync();
 
+            IPAddress ipAddress;
+            if (!IPAddress.TryParse(uri, out ipAddress))
+            {
+                IPAddress[] addresses = await Dns.GetHostAddressesAsync(uri);
+                ipAddress = addresses[0];
+            }
+            IPEndPoint iPEndPoint = new IPEndPoint(ipAddress, port);
+
             DateTime connectStartTime = DateTime.Now;
             while (socket.Connected == false && cancellationTokenSource.IsCancellationRequested == false)
             {
                 try
                 {
-                    await socket.ConnectAsync(uri, port);
+                    await socket.ConnectAsync(iPEndPoint);
                 }
                 catch (Exception e)
                 {

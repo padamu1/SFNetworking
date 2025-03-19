@@ -3,6 +3,7 @@ using SimulFactoryNetworking.Unity6.Runtime.Core;
 using System;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
@@ -23,7 +24,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
             this.receiveFilter = receiveFilter;
             this.serializer = serializer;
             this.receiveDelayMilliSeconds = receiveDelayMilliSeconds;
-            tcpPacketData = new TcpPacketData(8192, headerBufferSize);
+            tcpPacketData = new TcpPacketData(8192 * 2, headerBufferSize);
         }
 
         /// <summary>
@@ -31,22 +32,56 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
         /// </summary>
         protected override void SetSocket()
         {
-            socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
             socket.DualMode = true;
 
-            socket.ReceiveTimeout = receiveTimeOut;
-            socket.SendTimeout = sendTimeOut;
-
-            Debug.Log($"Buffer size : {socket.ReceiveBufferSize}");
-            socket.ReceiveBufferSize = Math.Min(socket.ReceiveBufferSize, 8192);
-            socket.SendBufferSize = 8192;
-
             socket.Blocking = false;
-            socket.NoDelay = true;
+            socket.ReceiveTimeout = 300000;
+            socket.SendTimeout = 120000;
+
+            try
+            {
+                socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.IpTimeToLive, 255);
+            }
+            catch (SocketException ex)
+            {
+                Debug.LogError($"Warning: TTL setting failed - {ex.Message}");
+            }
+
+            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer, 24 * 1024);
+
+            try
+            {
+                LingerOption lingerOption = new LingerOption(false, 0);
+                socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Linger, lingerOption);
+            }
+            catch (SocketException ex)
+            {
+                Debug.LogError($"Warning: LingerOption setting failed - {ex.Message}");
+            }
+
+            byte[] keepAlive = new byte[12];
+            BitConverter.GetBytes(1).CopyTo(keepAlive, 0);
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                BitConverter.GetBytes(60000).CopyTo(keepAlive, 4);
+                BitConverter.GetBytes(5000).CopyTo(keepAlive, 8);
+            }
+            else
+            {
+                BitConverter.GetBytes(60).CopyTo(keepAlive, 4);
+                BitConverter.GetBytes(5).CopyTo(keepAlive, 8);
+            }
+
+            socket.IOControl(IOControlCode.KeepAliveValues, keepAlive, null);
+
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
 
             receivePacketQueue = new ConcurrentQueue<T>();
 
             receiveArgs = new SocketAsyncEventArgs();
+            receiveArgs.DisconnectReuseSocket = false;
             receiveArgs.Completed += SocketReceiveEvent;
         }
 
@@ -55,16 +90,6 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
         /// </summary>
         protected override void RunReceiveBackGround()
         {
-            // keep alive
-            byte[] keepAlive = new byte[12];
-            BitConverter.GetBytes((uint)1).CopyTo(keepAlive, 0);
-            BitConverter.GetBytes((uint)15000).CopyTo(keepAlive, 4);
-            BitConverter.GetBytes((uint)5000).CopyTo(keepAlive, 8);
-            socket.IOControl(IOControlCode.KeepAliveValues, keepAlive, null);
-
-            // reuse socket
-            receiveArgs.DisconnectReuseSocket = true;
-
             // set buffer
             receiveArgs.SetBuffer(tcpPacketData.receiveBuffer);
             base.RunReceiveBackGround();
