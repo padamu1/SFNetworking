@@ -98,8 +98,16 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                         break;
                     }
 
-                    // if connect failed switch to v4 network
-                    iPEndPoint = new IPEndPoint(addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork), port);
+                    // if connect failed switch to AddressFamily network
+                    if (iPEndPoint.AddressFamily == AddressFamily.InterNetworkV6)
+                    {
+                        iPEndPoint = new IPEndPoint(addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork), port);
+                    }
+                    else
+                    {
+                        iPEndPoint = new IPEndPoint(addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetworkV6)
+                                  ?? addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork), port);
+                    }
 
                     SetSocket();
                 }
