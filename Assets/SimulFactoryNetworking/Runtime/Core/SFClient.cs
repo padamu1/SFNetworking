@@ -1,9 +1,9 @@
-using Codice.Client.Common;
 using System;
 using System.Collections.Concurrent;
+#if !UNITY_IOS
 using System.Linq;
 using System.Net;
-using System.Net.NetworkInformation;
+#endif
 using System.Net.Sockets;
 using System.Threading;
 using UnityEngine;
@@ -72,17 +72,23 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             // Switch to background thread
             await Awaitable.BackgroundThreadAsync();
 
+#if !UNITY_IOS
             IPAddress[] addresses = await Dns.GetHostAddressesAsync(uri);
             IPAddress ipAddress = addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetworkV6)
                                   ?? addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork);
             IPEndPoint iPEndPoint = new IPEndPoint(ipAddress, port);
+#endif
 
             DateTime connectStartTime = DateTime.Now;
             while (socket.Connected == false && cancellationTokenSource.IsCancellationRequested == false)
             {
                 try
                 {
+#if !UNITY_IOS
                     await socket.ConnectAsync(iPEndPoint);
+#else
+                    await socket.ConnectAsync(uri, port);
+#endif
                 }
                 catch (Exception e)
                 {
@@ -98,6 +104,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                         break;
                     }
 
+#if !UNITY_IOS
                     // if connect failed switch to AddressFamily network
                     if (iPEndPoint.AddressFamily == AddressFamily.InterNetworkV6)
                     {
@@ -108,6 +115,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                         iPEndPoint = new IPEndPoint(addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetworkV6)
                                   ?? addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork), port);
                     }
+#endif
 
                     SetSocket();
                 }
