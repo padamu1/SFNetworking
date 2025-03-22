@@ -165,7 +165,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         {
             await Awaitable.BackgroundThreadAsync();
 
-            if (IsConnected == false || cancellationTokenSource.IsCancellationRequested)
+            if (cancellationTokenSource.IsCancellationRequested)
             {
                 return;
             }
@@ -179,6 +179,14 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             }
 
             Interlocked.Exchange(ref isSent, 0);
+
+            if (sendQueue.IsEmpty == false)
+            {
+                if (Interlocked.Exchange(ref isSent, 1) == 0)
+                {
+                    _ = SendProcess();
+                }
+            }
         }
 
         /// <summary>
