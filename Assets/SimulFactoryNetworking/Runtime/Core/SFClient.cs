@@ -194,6 +194,11 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         /// </summary>
         private void TrySend()
         {
+            if (cancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+
             int remaining = sendBuffer.Length - bytesSent;
             if (remaining <= 0)
             {
@@ -219,27 +224,16 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         {
             if (CheckExceptionSocketError(e.SocketError))
             {
-                Disconnect();
+                _ = SendProcess();
                 return;
             }
 
-            if (e.BytesTransferred > 0)
+            if (e.SocketError == SocketError.Success)
             {
                 bytesSent += e.BytesTransferred;
+            }
 
-                if (bytesSent < sendBuffer.Length)
-                {
-                    TrySend();
-                }
-                else
-                {
-                    _ = SendProcess();
-                }
-            }
-            else
-            {
-                TrySend();
-            }
+            TrySend();
         }
 
         /// <summary>

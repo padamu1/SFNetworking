@@ -32,8 +32,12 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
         /// </summary>
         protected override void SetSocket()
         {
+#if UNITY_IOS
+            socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+#else
             socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
             socket.DualMode = true;
+#endif
 
             socket.Blocking = false;
             socket.ReceiveTimeout = 300000;
@@ -43,40 +47,41 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
             {
                 socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.IpTimeToLive, 255);
             }
-            catch (SocketException ex)
+            catch (Exception e)
             {
-                Debug.LogError($"Warning: TTL setting failed - {ex.Message}");
+                Debug.LogError($"Warning: TTL setting failed - {e.Message}");
             }
 
-            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer, 24 * 1024);
+            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer, 16 * 1024);
 
             try
             {
                 LingerOption lingerOption = new LingerOption(false, 0);
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Linger, lingerOption);
             }
-            catch (SocketException ex)
+            catch (Exception e)
             {
-                Debug.LogError($"Warning: LingerOption setting failed - {ex.Message}");
+                Debug.LogError($"Warning: LingerOption setting failed - {e.Message}");
             }
 
-            byte[] keepAlive = new byte[12];
-            BitConverter.GetBytes(1).CopyTo(keepAlive, 0);
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            try
             {
-                BitConverter.GetBytes(60000).CopyTo(keepAlive, 4);
-                BitConverter.GetBytes(5000).CopyTo(keepAlive, 8);
+                socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
             }
-            else
+            catch (Exception e)
             {
-                BitConverter.GetBytes(60).CopyTo(keepAlive, 4);
-                BitConverter.GetBytes(5).CopyTo(keepAlive, 8);
+                Debug.LogError($"Warning: Keep Alive setting failed - {e.Message}");
             }
 
-            socket.IOControl(IOControlCode.KeepAliveValues, keepAlive, null);
-
-            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+            try
+            {
+                socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Warning: No delay setting failed - {e.Message}");
+                socket.NoDelay = true;
+            }
 
             receivePacketQueue = new ConcurrentQueue<T>();
 
