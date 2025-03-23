@@ -6,6 +6,7 @@ using System.Net;
 #endif
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace SimulFactoryNetworking.Unity6.Runtime.Core
@@ -124,7 +125,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                     break;
                 }
 
-                await Awaitable.WaitForSecondsAsync(100);
+                await Task.Delay(100);
             }
 
             // Switch to main thread
