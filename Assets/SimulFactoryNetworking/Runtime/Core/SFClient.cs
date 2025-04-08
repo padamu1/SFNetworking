@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+
 #if !UNITY_IOS
 using System.Linq;
 using System.Net;
@@ -26,7 +28,9 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
 
         private SocketAsyncEventArgs sendAsyncArgs;
         private ConcurrentQueue<byte[]> sendQueue = new ConcurrentQueue<byte[]>();
-        private byte[] sendBuffer;
+
+        private List<ArraySegment<byte>> sendBufferList;
+        private int totalSendBytes;
         private int bytesSent;
 
         private int sendDelay;
@@ -49,7 +53,10 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
 
             sendAsyncArgs = new SocketAsyncEventArgs();
             sendAsyncArgs.DisconnectReuseSocket = false;
+            sendAsyncArgs.SocketFlags = SocketFlags.None;
             sendAsyncArgs.Completed += OnSend;
+
+            sendBufferList = new List<ArraySegment<byte>>();
         }
 
         protected abstract void SetSocket();
@@ -104,7 +111,6 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                     {
                         break;
                     }
-
 #if !UNITY_IOS
                     // if connect failed switch to AddressFamily network
                     if (iPEndPoint.AddressFamily == AddressFamily.InterNetworkV6)
@@ -171,9 +177,20 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                 return;
             }
 
-            bytesSent = 0;
+            sendAsyncArgs.BufferList = null;
 
-            if (sendQueue.TryDequeue(out sendBuffer))
+            bytesSent = 0;
+            totalSendBytes = 0;
+
+            sendBufferList.Clear();
+
+            while (sendQueue.TryDequeue(out var sendBuffer))
+            {
+                sendBufferList.Add(sendBuffer);
+                totalSendBytes += sendBuffer.Length;
+            }
+
+            if (sendBufferList.Count > 0)
             {
                 TrySend();
                 return;
@@ -200,14 +217,15 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                 return;
             }
 
-            int remaining = sendBuffer.Length - bytesSent;
+            int remaining = totalSendBytes - bytesSent;
             if (remaining <= 0)
             {
                 _ = SendProcess();
                 return;
             }
 
-            sendAsyncArgs.SetBuffer(sendBuffer, bytesSent, remaining);
+            sendAsyncArgs.BufferList = sendBufferList;
+            sendAsyncArgs.SetBuffer(bytesSent, remaining);
 
             bool willRaiseEvent = socket.SendAsync(sendAsyncArgs);
             if (!willRaiseEvent)
