@@ -1,6 +1,6 @@
 {
-    "name": "SimulFactoryNetworking.Unity6.Runtime",
-    "rootNamespace": "",
+    "name": "SimulFactory.SFNetworking",
+    "rootNamespace": "SimulFactory.SFNetworking",
     "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],

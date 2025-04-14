@@ -1,0 +1,17 @@
+{
+  "name": "com.simulfactory.sfnetworking",
+  "version": "1.0.0",
+  "displayName": "SFNetworking",
+  "description": "Suppport http & tcp socket networking on unity 6",
+  "unity": "6000.0",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "2.0.2"
+  },
+  "keywords": [
+  ],
+  "author": {
+    "name": "Mywatt",
+    "email": "padamu1@naver.com",
+    "url": "https://github.com/padamu1"
+  }
+}
