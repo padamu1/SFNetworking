@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using Newtonsoft.Json;
+using System.Collections.Generic;
 using System.Text;
-using Unity.Plastic.Newtonsoft.Json;
 
 namespace SimulFactoryNetworking.Unity6.Runtime.SFHttp.Data
 {
