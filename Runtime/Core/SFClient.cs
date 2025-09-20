@@ -23,27 +23,35 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         protected int connectTimeout;
         protected int receiveTimeOut;
         protected int sendTimeOut;
-        public event EventHandler<ConnectEventArgs> Conneted;
+        public event EventHandler<ConnectEventArgs> Connected;
         protected CancellationTokenSource cancellationTokenSource;
 
         private SocketAsyncEventArgs sendAsyncArgs;
         private ConcurrentQueue<byte[]> sendQueue = new ConcurrentQueue<byte[]>();
 
-        private List<ArraySegment<byte>> sendBufferList;
         private int totalSendBytes;
         private int bytesSent;
 
         private int sendDelay;
 
+        private DateTime connectStartTime;
+
         public bool IsConnected => socket == null || socket.Connected;
 
         private int isSent;
 
+        private byte[] sendBuffer;
+
+
+        private string uri;
+        private int port;
+        protected IPEndPoint endPoint;
+
         public SFClient()
         {
             SetSocket();
-            Conneted -= OnConnected;
-            Conneted += OnConnected;
+            Connected -= OnConnected;
+            Connected += OnConnected;
 
             connectTimeout = 60000;
             receiveTimeOut = 60000;
@@ -55,14 +63,16 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             sendAsyncArgs.DisconnectReuseSocket = false;
             sendAsyncArgs.SocketFlags = SocketFlags.None;
             sendAsyncArgs.Completed += OnSend;
-
-            sendBufferList = new List<ArraySegment<byte>>();
         }
 
         protected abstract void SetSocket();
 
         protected virtual void OnConnected(object sender, ConnectEventArgs connectEventArgs)
         {
+            sendAsyncArgs.RemoteEndPoint = endPoint;
+            sendAsyncArgs.UserToken = socket;
+            sendBuffer = new byte[socket.SendBufferSize > 1024 * 16 ? 1024 * 16 : socket.SendBufferSize];
+
             if (connectEventArgs.isConnected)
             {
                 RunReceiveBackGround();
@@ -72,82 +82,73 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         public void Connect(string uri, int port, int sendDelay)
         {
             this.sendDelay = sendDelay;
-            _ = ToConnect(uri, port);
+
+            this.uri = uri;
+            this.port = port;
+
+            connectStartTime = DateTime.Now;
+
+            Awaitable.BackgroundThreadAsync().OnCompleted(() => _ = SetEndPoint(SetConnection));
         }
 
-        private async Awaitable ToConnect(string uri, int port)
+        private async Awaitable SetEndPoint(Action onComplete)
         {
-            // Switch to background thread
-            await Awaitable.BackgroundThreadAsync();
-
-#if !UNITY_IOS
             IPAddress[] addresses = await Dns.GetHostAddressesAsync(uri);
-            IPAddress ipAddress = addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetworkV6)
-                                  ?? addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork);
-            IPEndPoint iPEndPoint = new IPEndPoint(ipAddress, port);
-#endif
+            IPAddress ipAddress = addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork)
+                                  ?? addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetworkV6);
 
-            DateTime connectStartTime = DateTime.Now;
-            while (socket.Connected == false && cancellationTokenSource.IsCancellationRequested == false)
+            endPoint = new IPEndPoint(ipAddress, port);
+
+            onComplete();
+        }
+
+        private void SetConnection()
+        {
+            SocketAsyncEventArgs connectionArgs = new SocketAsyncEventArgs();
+            connectionArgs.RemoteEndPoint = endPoint;
+            connectionArgs.UserToken = socket;
+            connectionArgs.Completed += OnSocketConnected;
+
+            bool pending = socket.ConnectAsync(connectionArgs);
+            if (pending == false)
             {
-                try
-                {
-#if !UNITY_IOS
-                    await socket.ConnectAsync(iPEndPoint);
-#else
-                    await socket.ConnectAsync(uri, port);
-#endif
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError(e);
-                }
-
-                if (socket.Connected == false)
-                {
-                    socket.Close();
-
-                    if ((DateTime.Now - connectStartTime).TotalMilliseconds > connectTimeout)
-                    {
-                        break;
-                    }
-#if !UNITY_IOS
-                    // if connect failed switch to AddressFamily network
-                    if (iPEndPoint.AddressFamily == AddressFamily.InterNetworkV6)
-                    {
-                        iPEndPoint = new IPEndPoint(addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork), port);
-                    }
-                    else
-                    {
-                        iPEndPoint = new IPEndPoint(addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetworkV6)
-                                  ?? addresses.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork), port);
-                    }
-#endif
-
-                    SetSocket();
-                }
-                else
-                {
-                    break;
-                }
-
-                await Task.Delay(100);
+                OnSocketConnected(this, connectionArgs);
             }
+        }
 
-            // Switch to main thread
-            await Awaitable.MainThreadAsync();
-
-            if (IsConnected)
+        private void OnSocketConnected(object sender, SocketAsyncEventArgs e)
+        {
+            if (e.SocketError == SocketError.Success)
             {
-                Conneted?.Invoke(this, new ConnectEventArgs()
-                {
-                    isConnected = socket.Connected
-                });
+                this.socket = e.UserToken as Socket;
+                _ = EndConnection(true);
+                return;
             }
             else
             {
-                Disconnect(SocketError.TimedOut);
+                if ((DateTime.Now - connectStartTime).TotalMilliseconds > connectTimeout)
+                {
+                    _ = EndConnection(false);
+                    return;
+                }
+                else
+                {
+                    SetSocket();
+                    _ = SetEndPoint(SetConnection);
+                }
             }
+        }
+
+        private async Awaitable EndConnection(bool connect)
+        {
+            await Awaitable.MainThreadAsync();
+
+            Connected?.Invoke(this, new ConnectEventArgs()
+            {
+                isConnected = connect
+            });
+
+            Connected = null;
         }
 
         public virtual void Disconnect(SocketError socketError = SocketError.Success)
@@ -182,15 +183,22 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             bytesSent = 0;
             totalSendBytes = 0;
 
-            sendBufferList.Clear();
-
             while (sendQueue.TryDequeue(out var sendBuffer))
             {
-                sendBufferList.Add(sendBuffer);
+                if (totalSendBytes + sendBuffer.Length > this.sendBuffer.Length)
+                {
+                    break;
+                }
+
+                for (int i = 0; i < sendBuffer.Length; i++)
+                {
+                    this.sendBuffer[totalSendBytes + i] = sendBuffer[i];
+                }
+
                 totalSendBytes += sendBuffer.Length;
             }
 
-            if (sendBufferList.Count > 0)
+            if (totalSendBytes > 0)
             {
                 TrySend();
                 return;
@@ -224,8 +232,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                 return;
             }
 
-            sendAsyncArgs.BufferList = sendBufferList;
-            sendAsyncArgs.SetBuffer(bytesSent, remaining);
+            sendAsyncArgs.SetBuffer(sendBuffer, bytesSent, remaining);
 
             bool willRaiseEvent = socket.SendAsync(sendAsyncArgs);
             if (!willRaiseEvent)
@@ -241,9 +248,9 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         /// <param name="e"></param>
         private void OnSend(object? sender, SocketAsyncEventArgs e)
         {
-            if (CheckExceptionSocketError(e.SocketError))
+            if (CheckKnownException(e.SocketError) == false)
             {
-                _ = SendProcess();
+                Disconnect(e.SocketError);
                 return;
             }
 
@@ -260,10 +267,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         /// </summary>
         protected virtual void RunReceiveBackGround()
         {
-            if (IsConnected)
-            {
-                _ = Receive();
-            }
+            _ = Receive();
         }
 
         protected abstract void SocketReceiveEvent(object sender, SocketAsyncEventArgs args);
@@ -310,6 +314,21 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
         protected bool CheckExceptionSocketError(SocketError socketError)
         {
             if (socketError == SocketError.OperationAborted || socketError == SocketError.ConnectionAborted || socketError == SocketError.ConnectionReset || socketError == SocketError.NotConnected || socketError == SocketError.ConnectionRefused)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Check socket error
+        /// </summary>
+        /// <param name="socketError"></param>
+        /// <returns></returns>
+        protected bool CheckKnownException(SocketError socketError)
+        {
+            if (socketError == SocketError.WouldBlock || socketError == SocketError.Success)
             {
                 return true;
             }
