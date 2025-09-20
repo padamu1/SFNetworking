@@ -27,6 +27,17 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
             tcpPacketData = new TcpPacketData(8192 * 2, headerBufferSize);
         }
 
+        protected override void OnConnected(object sender, ConnectEventArgs connectEventArgs)
+        {
+            if (connectEventArgs.isConnected)
+            {
+                // set buffer
+                receiveArgs.SetBuffer(tcpPacketData.receiveBuffer);
+            }
+
+            base.OnConnected(sender, connectEventArgs);
+        }
+
         /// <summary>
         /// Set Socket Option for tcp socket networking
         /// </summary>
@@ -90,21 +101,8 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
             receiveArgs.Completed += SocketReceiveEvent;
         }
 
-        /// <summary>
-        /// Set Socket keep alive option
-        /// </summary>
-        protected override void RunReceiveBackGround()
+        protected override void Receive()
         {
-            // set buffer
-            receiveArgs.SetBuffer(tcpPacketData.receiveBuffer);
-            base.RunReceiveBackGround();
-        }
-
-        protected override async Awaitable Receive()
-        {
-            // receive data on backgroudnthread
-            await Awaitable.BackgroundThreadAsync();
-
             if (IsConnected == false)
             {
                 Disconnect(SocketError.NotConnected);
@@ -131,7 +129,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
 
             if (args.SocketError != SocketError.WouldBlock && args.SocketError != SocketError.Success)
             {
-                _ = Receive();
+                Receive();
                 return;
             }
 
@@ -156,7 +154,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.SFTcp
                 }
             }
 
-            _ = Receive();
+            Receive();
         }
 
         public void Send(T packet)

@@ -69,13 +69,13 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
 
         protected virtual void OnConnected(object sender, ConnectEventArgs connectEventArgs)
         {
-            sendAsyncArgs.RemoteEndPoint = endPoint;
-            sendAsyncArgs.UserToken = socket;
-            sendBuffer = new byte[socket.SendBufferSize > 1024 * 16 ? 1024 * 16 : socket.SendBufferSize];
-
             if (connectEventArgs.isConnected)
             {
-                RunReceiveBackGround();
+                sendAsyncArgs.RemoteEndPoint = endPoint;
+                sendAsyncArgs.UserToken = socket;
+                sendBuffer = new byte[socket.SendBufferSize > 1024 * 16 ? 1024 * 16 : socket.SendBufferSize];
+
+                Awaitable.BackgroundThreadAsync().OnCompleted(Receive);
             }
         }
 
@@ -262,21 +262,13 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
             TrySend();
         }
 
-        /// <summary>
-        /// Start Receive Method
-        /// </summary>
-        protected virtual void RunReceiveBackGround()
-        {
-            _ = Receive();
-        }
-
         protected abstract void SocketReceiveEvent(object sender, SocketAsyncEventArgs args);
 
         /// <summary>
-        /// Receive data with awaitable method
+        /// Receive data method
         /// </summary>
         /// <returns></returns>
-        protected abstract Awaitable Receive();
+        protected abstract void Receive();
 
         /// <summary>
         /// Set connnect timeout <br />
