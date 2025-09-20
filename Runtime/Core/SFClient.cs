@@ -31,7 +31,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
 
         private DateTime connectStartTime;
 
-        public bool IsConnected => socket == null || socket.Connected;
+        public bool IsConnected => socket != null && socket.Connected;
 
         private int isSent;
 
