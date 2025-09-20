@@ -190,10 +190,7 @@ namespace SimulFactoryNetworking.Unity6.Runtime.Core
                     break;
                 }
 
-                for (int i = 0; i < sendBuffer.Length; i++)
-                {
-                    this.sendBuffer[totalSendBytes + i] = sendBuffer[i];
-                }
+                Buffer.BlockCopy(sendBuffer, 0, this.sendBuffer, totalSendBytes, sendBuffer.Length);
 
                 totalSendBytes += sendBuffer.Length;
             }
